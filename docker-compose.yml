@@ -1,0 +1,95 @@
+# AiMate Docker Compose Configuration
+#
+# 数据持久化说明：
+# ~/.nanobot/ 目录包含所有需要持久化的数据：
+#   - config.json     : 配置文件（API密钥等）
+#   - workspace/      : 工作空间（对话记录、记忆、笔记等）
+#   - knowledge/      : 知识库索引
+#   - cron/           : 定时任务数据
+#   - whitelist.json  : Web UI 认证白名单
+#
+# 首次部署步骤：
+#   1. mkdir -p ~/.nanobot
+#   2. 创建配置文件 ~/.nanobot/config.json（填入API密钥）
+#      或通过环境变量配置（见下方 environment 示例）
+#   3. docker compose up -d nanobot-gateway
+#   4. 容器启动时会自动执行 onboard 初始化工作空间
+#
+# 环境变量配置（可选）：
+#   NANOBOT_DEEPSEEK_API_KEY    - DeepSeek API Key
+#   NANOBOT_OPENAI_API_KEY      - OpenAI API Key
+#   NANOBOT_ANTHROPIC_API_KEY   - Anthropic API Key
+#   NANOBOT_OPENROUTER_API_KEY  - OpenRouter API Key
+#   NANOBOT_WEB_PASSWORD        - Web UI 访问密码
+#   NANOBOT_PERSISTENCE_SECRET  - 数据持久化签名密钥
+
+x-common-config: &common-config
+  build:
+    context: .
+    dockerfile: Dockerfile
+  volumes:
+    - ~/.nanobot:/root/.nanobot
+  restart: unless-stopped
+  networks:
+    - nanobot-network
+
+services:
+  nanobot-gateway:
+    container_name: nanobot-gateway
+    <<: *common-config
+    command: ["gateway"]
+    ports:
+      - "18790:18790"
+      - "8080:8080"
+    environment:
+      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
+      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
+      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
+      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
+      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
+      - NANOBOT_PERSISTENCE_SECRET=${NANOBOT_PERSISTENCE_SECRET:-}
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nanobot-cli:
+    container_name: nanobot-cli
+    <<: *common-config
+    profiles:
+      - cli
+    command: ["agent"]
+    stdin_open: true
+    tty: true
+    environment:
+      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
+      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
+      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
+      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+networks:
+  nanobot-network:
+    driver: bridge
