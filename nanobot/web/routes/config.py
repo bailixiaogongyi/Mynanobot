@@ -22,6 +22,24 @@ SENSITIVE_FIELDS = [
 ]
 
 
+class ProviderModelInfo(BaseModel):
+    """Provider model information for UI display."""
+
+    model_id: str
+    display_name: str
+    description: str = ""
+    max_tokens: int = 4096
+    supports_vision: bool = False
+    supports_function_calling: bool = True
+    input_price: float = 0.0
+    output_price: float = 0.0
+    status: str = "active"
+    currency: str = "CNY"
+    token_quota: int = 0
+    token_used: int = 0
+    is_custom: bool = False
+
+
 class ProviderInfo(BaseModel):
     """Provider configuration info."""
 
@@ -35,6 +53,7 @@ class ProviderInfo(BaseModel):
     is_oauth: bool = False
     is_gateway: bool = False
     is_local: bool = False
+    models: list[ProviderModelInfo] = []
 
 
 class ModelInfo(BaseModel):
@@ -217,58 +236,106 @@ async def get_config(request: Request) -> ConfigOverview:
     """
     from nanobot.providers.registry import PROVIDERS, find_by_name
 
+    try:
+        from nanobot.providers.provider_models import get_models_by_provider
+    except Exception:
+        logger.warning("Failed to import provider_models module")
+        get_models_by_provider = None
+
     config = _get_config(request)
 
     providers = []
-    provider_names = [
-        "custom", "openrouter", "aihubmix", "siliconflow", "volcengine",
-        "anthropic", "openai", "openai_codex", "github_copilot",
-        "deepseek", "gemini", "zhipu", "dashscope", "moonshot", "minimax",
-        "vllm", "groq",
-    ]
+    for spec in PROVIDERS:
+        provider_config = getattr(config.providers, spec.name, None)
+        if not provider_config:
+            continue
 
-    provider_descriptions = {
-        "custom": "自定义 OpenAI 兼容端点",
-        "openrouter": "全球模型网关，支持多种模型",
-        "aihubmix": "多模型聚合网关",
-        "siliconflow": "硅基流动 API 网关",
-        "volcengine": "火山引擎 API 网关",
-        "anthropic": "Claude 模型直连",
-        "openai": "GPT 模型直连",
-        "openai_codex": "ChatGPT Codex API (OAuth)",
-        "github_copilot": "GitHub Copilot (OAuth)",
-        "deepseek": "DeepSeek 模型直连",
-        "gemini": "Google Gemini 模型直连",
-        "zhipu": "智谱 GLM 模型",
-        "dashscope": "阿里云通义千问",
-        "moonshot": "Kimi 模型",
-        "minimax": "MiniMax 模型直连",
-        "vllm": "vLLM 本地部署",
-        "groq": "Groq 模型 (主要用于语音转录)",
-    }
+        has_key = bool(provider_config.api_key)
+        
+        model_infos = []
+        if get_models_by_provider:
+            try:
+                provider_models = get_models_by_provider(spec.name)
+                model_infos = [
+                    ProviderModelInfo(
+                        model_id=pm.model_id,
+                        display_name=pm.display_name,
+                        description=pm.description,
+                        max_tokens=pm.max_tokens,
+                        supports_vision=pm.supports_vision,
+                        supports_function_calling=pm.supports_function_calling,
+                        input_price=pm.input_price,
+                        output_price=pm.output_price,
+                        status=pm.status,
+                        currency=getattr(pm, 'currency', 'CNY'),
+                        token_quota=getattr(pm, 'token_quota', 0),
+                        token_used=getattr(pm, 'token_used', 0),
+                        is_custom=getattr(pm, 'is_custom', False),
+                    )
+                    for pm in provider_models
+                ]
+            except Exception as e:
+                logger.warning(f"Failed to get models for provider {spec.name}: {e}")
 
-    for name in provider_names:
-        provider = getattr(config.providers, name, None)
-        if provider:
-            has_key = bool(provider.api_key)
-            spec = find_by_name(name)
-            display_name = spec.display_name if spec else name.title()
-            description = provider_descriptions.get(name, "")
-            is_oauth = spec.is_oauth if spec else False
-            is_gateway = spec.is_gateway if spec else False
-            is_local = spec.is_local if spec else False
-            providers.append(ProviderInfo(
-                name=name,
-                display_name=display_name,
-                description=description,
-                enabled=has_key,
-                has_key=has_key,
-                key_masked=_mask_sensitive(provider.api_key) if has_key else "",
-                api_base=provider.api_base or "",
-                is_oauth=is_oauth,
-                is_gateway=is_gateway,
-                is_local=is_local,
-            ))
+        # Merge custom models
+        try:
+            from nanobot.config.custom_models import load_custom_models
+            custom_models = load_custom_models()
+            if spec.name in custom_models:
+                for model_id, custom_config in custom_models[spec.name].items():
+                    # Check if model already exists
+                    existing = next((m for m in model_infos if m.model_id == model_id), None)
+                    if existing:
+                        # Update existing model with custom config
+                        model_infos.remove(existing)
+                        model_infos.append(ProviderModelInfo(
+                            model_id=model_id,
+                            display_name=custom_config.get("display_name", existing.display_name),
+                            description=custom_config.get("description", existing.description),
+                            max_tokens=custom_config.get("max_tokens", existing.max_tokens),
+                            supports_vision=custom_config.get("supports_vision", existing.supports_vision),
+                            supports_function_calling=custom_config.get("supports_function_calling", existing.supports_function_calling),
+                            input_price=custom_config.get("input_price", existing.input_price),
+                            output_price=custom_config.get("output_price", existing.output_price),
+                            status=custom_config.get("status", existing.status),
+                            currency=custom_config.get("currency", "CNY"),
+                            token_quota=custom_config.get("token_quota", 0),
+                            token_used=custom_config.get("token_used", 0),
+                            is_custom=True,
+                        ))
+                    else:
+                        # Add new custom model
+                        model_infos.append(ProviderModelInfo(
+                            model_id=model_id,
+                            display_name=custom_config.get("display_name", model_id),
+                            description=custom_config.get("description", ""),
+                            max_tokens=custom_config.get("max_tokens", 4096),
+                            supports_vision=custom_config.get("supports_vision", False),
+                            supports_function_calling=custom_config.get("supports_function_calling", True),
+                            input_price=custom_config.get("input_price", 0.0),
+                            output_price=custom_config.get("output_price", 0.0),
+                            status=custom_config.get("status", "active"),
+                            currency=custom_config.get("currency", "CNY"),
+                            token_quota=custom_config.get("token_quota", 0),
+                            token_used=custom_config.get("token_used", 0),
+                            is_custom=True,
+                        ))
+        except Exception as e:
+            logger.warning(f"Failed to load custom models for provider {spec.name}: {e}")
+
+        providers.append(ProviderInfo(
+            name=spec.name,
+            display_name=spec.display_name or spec.name.title(),
+            description=spec.description,
+            enabled=has_key,
+            has_key=has_key,
+            key_masked=_mask_sensitive(provider_config.api_key) if has_key else "",
+            api_base=provider_config.api_base or "",
+            is_oauth=spec.is_oauth,
+            is_gateway=spec.is_gateway,
+            is_local=spec.is_local,
+            models=model_infos,
+        ))
 
     channels = [
         ChannelInfo(
@@ -513,6 +580,109 @@ async def set_provider_api_key(
     }
 
 
+class TestConnectionResult(BaseModel):
+    """Result of provider connection test."""
+
+    success: bool
+    message: str
+    model_used: str = ""
+    latency_ms: int = 0
+
+
+@router.post("/provider/{provider_name}/test", response_model=TestConnectionResult)
+async def test_provider_connection(
+    provider_name: str,
+    request: Request,
+) -> TestConnectionResult:
+    """Test provider API connection.
+
+    Args:
+        provider_name: Provider name.
+
+    Returns:
+        Test result with success status and message.
+    """
+    import time
+
+    config = _get_config(request)
+
+    provider = getattr(config.providers, provider_name, None)
+    if not provider:
+        raise HTTPException(status_code=404, detail=f"Provider not found: {provider_name}")
+
+    if not provider.api_key:
+        return TestConnectionResult(
+            success=False,
+            message="API key not configured",
+        )
+
+    from nanobot.providers.provider_models import get_models_by_provider
+    from nanobot.providers.registry import find_by_name, PROVIDERS
+    from litellm import acompletion
+
+    spec = find_by_name(provider_name)
+    if not spec:
+        return TestConnectionResult(
+            success=False,
+            message=f"Provider spec not found: {provider_name}",
+        )
+
+    models = get_models_by_provider(provider_name)
+    if not models:
+        default_model = "gpt-3.5-turbo"
+        if spec.litellm_prefix:
+            default_model = f"{spec.litellm_prefix}/{default_model}"
+    else:
+        first_model = models[0]
+        model_id = first_model.model_id
+        if spec.litellm_prefix and not model_id.startswith(spec.litellm_prefix):
+            default_model = f"{spec.litellm_prefix}/{model_id}"
+        else:
+            default_model = model_id
+
+    try:
+        start_time = time.time()
+
+        response = await acompletion(
+            model=default_model,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+            api_key=provider.api_key,
+            api_base=provider.api_base or spec.default_api_base,
+            timeout=30,
+        )
+
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        return TestConnectionResult(
+            success=True,
+            message="Connection successful",
+            model_used=default_model,
+            latency_ms=latency_ms,
+        )
+
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg or "invalid" in error_msg.lower():
+            message = "Invalid API key"
+        elif "403" in error_msg or "Forbidden" in error_msg:
+            message = "Access forbidden - check API permissions"
+        elif "404" in error_msg or "Not Found" in error_msg:
+            message = "API endpoint not found"
+        elif "timeout" in error_msg.lower():
+            message = "Connection timeout"
+        elif "connection" in error_msg.lower():
+            message = "Connection failed - check network"
+        else:
+            message = f"Error: {error_msg[:100]}"
+
+        return TestConnectionResult(
+            success=False,
+            message=message,
+            model_used=default_model,
+        )
+
+
 @router.post("/knowledge/toggle")
 async def toggle_knowledge(
     request: Request,
@@ -530,8 +700,11 @@ async def toggle_knowledge(
 
     config.tools.knowledge.index.enabled = enabled
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -609,8 +782,11 @@ async def set_channel_config(
         if update.secret:
             channel.secret = update.secret
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -646,13 +822,16 @@ async def set_tool_config(
     else:
         raise HTTPException(status_code=404, detail=f"Tool not found: {tool_name}")
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
         "tool": tool_name,
-        "message": f"Tool {tool_name} configuration updated.",
+        "message": f"Tool {tool_name} configuration updated. Restart required for changes to take effect.",
     }
 
 
@@ -749,8 +928,11 @@ async def set_agent_defaults(
     if update.workspace is not None:
         config.agents.defaults.workspace = update.workspace
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -782,8 +964,11 @@ async def set_subagent_config(
     if update.workspace_isolation is not None:
         config.agents.subagent.workspace_isolation = update.workspace_isolation
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -811,8 +996,11 @@ async def set_upload_config(
     if update.max_file_size is not None:
         config.upload.max_file_size = update.max_file_size
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -840,8 +1028,11 @@ async def set_gateway_config(
     if update.port is not None:
         config.gateway.port = update.port
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -875,8 +1066,11 @@ async def set_webui_config(
     if update.auth_password is not None:
         config.gateway.web_ui.auth.password = update.auth_password
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -904,8 +1098,11 @@ async def set_tools_config(
     if update.exec_timeout is not None:
         config.tools.exec.timeout = update.exec_timeout
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -947,8 +1144,11 @@ async def set_knowledge_config(
     if update.use_llm_extract is not None:
         config.tools.knowledge.index.use_llm_extract = update.use_llm_extract
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "updated",
@@ -1058,8 +1258,11 @@ async def reset_config(request: Request) -> dict[str, Any]:
     config.agents.defaults.model = default_config.agents.defaults.model
     config.tools.knowledge.index.enabled = default_config.tools.knowledge.index.enabled
 
-    from nanobot.config.loader import save_config
+    from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
 
     return {
         "status": "reset",
@@ -1228,3 +1431,100 @@ async def get_restart_status(request: Request) -> dict[str, Any]:
         "status": "no_restart",
         "message": "No restart in progress.",
     }
+
+
+class CustomModelConfig(BaseModel):
+    """Custom model configuration."""
+
+    model_id: str
+    display_name: str = ""
+    description: str = ""
+    max_tokens: int = 4096
+    supports_vision: bool = False
+    supports_function_calling: bool = True
+    supports_streaming: bool = True
+    input_price: float = 0.0
+    output_price: float = 0.0
+    status: str = "active"
+    currency: str = "CNY"
+    token_quota: int = 0
+    token_used: int = 0
+
+
+@router.get("/provider/{provider_name}/models/custom")
+async def get_custom_models(provider_name: str) -> list[dict[str, Any]]:
+    """Get custom models for a provider.
+    
+    Args:
+        provider_name: Provider name.
+        
+    Returns:
+        List of custom model configurations.
+    """
+    from nanobot.config.custom_models import load_custom_models
+    
+    models = load_custom_models()
+    provider_models = models.get(provider_name, {})
+    return list(provider_models.values())
+
+
+@router.post("/provider/{provider_name}/models/custom")
+async def save_custom_model(
+    provider_name: str,
+    model_config: CustomModelConfig,
+    request: Request,
+) -> dict[str, Any]:
+    """Save a custom model configuration.
+    
+    Args:
+        provider_name: Provider name.
+        model_config: Model configuration.
+        
+    Returns:
+        Save result.
+    """
+    from nanobot.config.custom_models import set_custom_model
+    
+    config_dict = model_config.model_dump()
+    config_dict["is_custom"] = True
+    set_custom_model(provider_name, model_config.model_id, config_dict)
+    
+    return {
+        "status": "saved",
+        "provider": provider_name,
+        "model_id": model_config.model_id,
+        "message": "Custom model saved successfully.",
+    }
+
+
+@router.delete("/provider/{provider_name}/models/custom/{model_id}")
+async def delete_custom_model(
+    provider_name: str,
+    model_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Delete a custom model configuration.
+    
+    Args:
+        provider_name: Provider name.
+        model_id: Model identifier.
+        
+    Returns:
+        Delete result.
+    """
+    from nanobot.config.custom_models import delete_custom_model as delete_model
+    
+    deleted = delete_model(provider_name, model_id)
+    
+    if deleted:
+        return {
+            "status": "deleted",
+            "provider": provider_name,
+            "model_id": model_id,
+            "message": "Custom model deleted successfully.",
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Custom model not found: {provider_name}/{model_id}",
+        )

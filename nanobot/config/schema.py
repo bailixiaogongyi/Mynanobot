@@ -15,7 +15,7 @@ class Base(BaseModel):
 class WhatsAppConfig(Base):
     """WhatsApp channel configuration."""
 
-    enabled: bool = True
+    enabled: bool = False
     bridge_url: str = "ws://localhost:3001"
     bridge_token: str = ""  # Shared token for bridge auth (optional, recommended)
     allow_from: list[str] = Field(default_factory=list)  # Allowed phone numbers
@@ -270,6 +270,9 @@ class ProvidersConfig(Base):
     volcengine: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine (火山引擎) API gateway
     openai_codex: ProviderConfig = Field(default_factory=ProviderConfig)  # OpenAI Codex (OAuth)
     github_copilot: ProviderConfig = Field(default_factory=ProviderConfig)  # Github Copilot (OAuth)
+    scnet: ProviderConfig = Field(default_factory=ProviderConfig)  # 国家超算互联网
+    qiniu: ProviderConfig = Field(default_factory=ProviderConfig)  # 七牛云
+    baishan: ProviderConfig = Field(default_factory=ProviderConfig)  # 白山智算
 
 
 class HeartbeatConfig(Base):

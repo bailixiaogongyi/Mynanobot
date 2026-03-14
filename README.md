@@ -36,19 +36,19 @@
 
 ### 核心特性
 
-| 特性                    | 描述                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| 🪶 **超轻量**           | 核心代码 ~4,000 行，启动快速，资源占用低                                       |
-| 🔌 **多渠道**           | 支持 Telegram、Discord、WhatsApp、飞书、Slack、QQ、邮件等                      |
-| 🤖 **多模型**           | 支持 OpenRouter、Anthropic、OpenAI、DeepSeek、Gemini 等 20+ 提供商             |
-| 🛠️ **工具调用**         | 内置文件操作、Shell 执行、网络搜索、天气查询、MCP 协议、浏览器脚本执行器等工具 |
-| 🧠 **记忆系统**         | 双层记忆架构（长期记忆 + 历史日志）                                            |
-| 📚 **知识检索**         | 混合检索（BM25 + 向量），支持笔记索引                                          |
-| ⏰ **定时任务**         | Cron 表达式和间隔调度                                                          |
-| 🌐 **Web UI**           | FastAPI + Vue 3 现代化界面，支持配置管理                                       |
-| 🔐 **安全认证**         | 固定密码 + 设备指纹白名单，保护 Web UI 访问安全                                |
-| 🇨🇳 **国内适配**         | 博查搜索、心知天气，完美支持国内网络环境                                       |
-| 🖥️ **浏览器脚本执行器** | 用户定义JSON脚本，AI调度执行                                                   |
+| 特性                    | 描述                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| 🪶 **超轻量**           | 核心代码 ~4,000 行，启动快速，资源占用低                                                                |
+| 🔌 **多渠道**           | 支持 Telegram、Discord、WhatsApp、飞书、Slack、QQ、邮件等                                               |
+| 🤖 **多模型**           | 支持 OpenRouter、Anthropic、OpenAI、DeepSeek、Gemini 等 20+ 提供商，含 SCNet、Qiniu、Baishan 国内提供商 |
+| 🛠️ **工具调用**         | 内置文件操作、Shell 执行、网络搜索、天气查询、MCP 协议、浏览器脚本执行器等工具                          |
+| 🧠 **记忆系统**         | 双层记忆架构（长期记忆 + 历史日志）                                                                     |
+| 📚 **知识检索**         | 混合检索（BM25 + 向量），支持笔记索引                                                                   |
+| ⏰ **定时任务**         | Cron 表达式和间隔调度                                                                                   |
+| 🌐 **Web UI**           | FastAPI + Vue 3 现代化界面，支持配置管理                                                                |
+| 🔐 **安全认证**         | 固定密码 + 设备指纹白名单，保护 Web UI 访问安全                                                         |
+| 🇨🇳 **国内适配**         | 博查搜索、心知天气，完美支持国内网络环境                                                                |
+| 🖥️ **浏览器脚本执行器** | 用户定义JSON脚本，AI调度执行                                                                            |
 
 ---
 
@@ -236,7 +236,11 @@ Provider Registry (registry.py)
     ├── VolcEngine (火山引擎)
     ├── SiliconFlow (硅基流动)
     ├── AIHubMix (多模型聚合)
+    ├── SCNet (国家超算互联网)
+    ├── Qiniu (七牛云)
+    ├── Baishan (白山智算)
     ├── vLLM (本地部署)
+    ├── Ollama (本地部署)
     ├── OpenAI Codex (ChatGPT OAuth)
     ├── GitHub Copilot (Copilot OAuth)
     └── Custom (自定义 OpenAI 兼容端点)
@@ -910,6 +914,27 @@ notepad %USERPROFILE%\.nanobot\config.json
 }
 ```
 
+#### 支持的 LLM 提供商
+
+| 提供商      | 环境变量             | 配置字段                | 说明           |
+| ----------- | -------------------- | ----------------------- | -------------- |
+| OpenAI      | `OPENAI_API_KEY`     | `providers.openai`      | GPT 模型       |
+| Anthropic   | `ANTHROPIC_API_KEY`  | `providers.anthropic`   | Claude 模型    |
+| DeepSeek    | `DEEPSEEK_API_KEY`   | `providers.deepseek`    | DeepSeek 模型  |
+| Gemini      | `GOOGLE_API_KEY`     | `providers.gemini`      | Google Gemini  |
+| Zhipu       | `ZAI_API_KEY`        | `providers.zhipu`       | 智谱 GLM       |
+| DashScope   | `DASHSCOPE_API_KEY`  | `providers.dashscope`   | 通义千问       |
+| Moonshot    | `MOONSHOT_API_KEY`   | `providers.moonshot`    | Kimi           |
+| MiniMax     | `MINIMAX_API_KEY`    | `providers.minimax`     | MiniMax        |
+| OpenRouter  | `OPENROUTER_API_KEY` | `providers.openrouter`  | 全球模型网关   |
+| SiliconFlow | `OPENAI_API_KEY`     | `providers.siliconflow` | 硅基流动       |
+| VolcEngine  | `OPENAI_API_KEY`     | `providers.volcengine`  | 火山引擎       |
+| SCNet       | `SCNET_API_KEY`      | `providers.scnet`       | 国家超算互联网 |
+| Qiniu       | `QINIU_API_KEY`      | `providers.qiniu`       | 七牛云         |
+| Baishan     | `BAISHAN_API_KEY`    | `providers.baishan`     | 白山智算       |
+
+**注意**：SCNet、Qiniu、Baishan 为国内优化线路，适合国内用户使用。
+
 ---
 
 ### 四、启动服务
@@ -974,6 +999,9 @@ journalctl --user -u nanobot-gateway -f
 ### 五、访问 Web UI
 
 浏览器访问：`http://服务器IP:8080`
+
+- **Web UI 端口**: 8080 (默认)
+- **Gateway API 端口**: 18790 (默认)
 
 首次启动时，日志会显示自动生成的登录密码：
 

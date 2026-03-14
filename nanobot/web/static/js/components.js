@@ -1347,7 +1347,7 @@ const NotesPage = {
                     <textarea v-model="editorContent" class="editor-textarea" placeholder="选择或创建笔记..." :disabled="!currentFile"></textarea>
                 </div>
             </div>
-            <div class="modal-overlay" v-if="showSearchResults" @click.self="showSearchResults = false">
+            <div class="modal-overlay" v-if="showSearchResults">
                 <div class="modal">
                     <div class="modal-header">
                         <h3 class="modal-title">搜索结果: {{ searchQuery }}</h3>
@@ -1355,7 +1355,7 @@ const NotesPage = {
                     </div>
                     <div class="modal-body">
                         <div v-for="result in searchResults" :key="result.id" class="search-result-item" @click="openSearchResult(result)">
-                            <div class="result-score">相关度: {{ (result.score * 100).toFixed(1) }}%</div>
+                            <div class="result-score">相关度: {{ formatScore(result.score) }}%</div>
                             <div class="result-content">{{ result.content.substring(0, 200) }}...</div>
                             <div class="result-source">{{ result.source }}</div>
                         </div>
@@ -1573,7 +1573,7 @@ const SkillsPage = {
                     <p>暂无技能</p>
                 </div>
             </div>
-            <div class="modal-overlay" v-if="selectedSkill" @click.self="selectedSkill = null">
+            <div class="modal-overlay" v-if="selectedSkill">
                 <div class="modal modal-lg">
                     <div class="modal-header">
                         <h3 class="modal-title">{{ selectedSkill.name }}</h3>
@@ -1674,10 +1674,41 @@ const SkillsPage = {
 const ConfigPage = {
   template: `
         <div class="page-container">
-            <div class="config-content">
-                <div class="service-overview-card">
-                    <div class="overview-header"><h3 class="overview-title">服务状态总览</h3></div>
-                    <div class="service-overview">
+            <div class="config-layout">
+                <div class="config-sidebar">
+                    <div class="sidebar-section">
+                        <div class="sidebar-title">配置导航</div>
+                        <div :class="['sidebar-item', { active: activeSection === 'overview' }]" @click="activeSection = 'overview'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            <span>总览</span>
+                        </div>
+                        <div :class="['sidebar-item', { active: activeSection === 'model' }]" @click="activeSection = 'model'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="8" cy="14" r="2"/><circle cx="16" cy="14" r="2"/></svg>
+                            <span>模型配置</span>
+                        </div>
+                        <div :class="['sidebar-item', { active: activeSection === 'channel' }]" @click="activeSection = 'channel'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <span>通道配置</span>
+                        </div>
+                        <div :class="['sidebar-item', { active: activeSection === 'agent' }]" @click="activeSection = 'agent'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            <span>Agent配置</span>
+                        </div>
+                        <div :class="['sidebar-item', { active: activeSection === 'knowledge' }]" @click="activeSection = 'knowledge'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            <span>知识检索</span>
+                        </div>
+                        <div :class="['sidebar-item', { active: activeSection === 'system' }]" @click="activeSection = 'system'">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <span>系统配置</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="config-main">
+                    <div v-if="activeSection === 'overview'" class="config-section">
+                        <div class="service-overview-card">
+                            <div class="overview-header"><h3 class="overview-title">服务状态总览</h3></div>
+                            <div class="service-overview">
                     <div class="overview-main">
                         <div class="overview-stat">
                             <svg class="overview-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="8" cy="14" r="2"/><circle cx="16" cy="14" r="2"/></svg>
@@ -1693,17 +1724,22 @@ const ConfigPage = {
                                 <span class="overview-value">{{ currentProviderName }}</span>
                             </div>
                         </div>
-                        <div class="overview-stat">
-                            <svg class="overview-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                            <div class="overview-info">
-                                <span class="overview-label">思考过程</span>
-                                <span :class="['overview-value', config.model.enable_reasoning ? 'text-success' : 'text-warning']">
-                                    {{ config.model.enable_reasoning ? '已启用' : '已禁用' }}
-                                </span>
-                            </div>
-                        </div>
                     </div>
                     <div class="overview-modules">
+                        <div class="module-status-item">
+                            <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span class="module-label">思考过程</span>
+                            <span :class="['module-value', agentDefaults.enable_reasoning ? 'text-success' : 'text-muted']">
+                                {{ agentDefaults.enable_reasoning ? '已启用' : '已禁用' }}
+                            </span>
+                        </div>
+                        <div class="module-status-item">
+                            <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                            <span class="module-label">工具调用</span>
+                            <span :class="['module-value', agentDefaults.max_tool_iterations > 0 ? 'text-success' : 'text-muted']">
+                                {{ agentDefaults.max_tool_iterations > 0 ? '已启用 (最大 ' + agentDefaults.max_tool_iterations + ' 次)' : '已禁用' }}
+                            </span>
+                        </div>
                         <div class="module-status-item">
                             <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                             <span class="module-label">通信渠道</span>
@@ -1733,30 +1769,24 @@ const ConfigPage = {
                             </span>
                         </div>
                     </div>
-                    <div class="overview-actions">
-                        <span class="form-hint">⚠️ 部分配置更改后需重启服务才能生效</span>
-                        <button class="btn btn-primary" @click="restartService" :disabled="restarting">
-                            {{ restarting ? '重启中...' : '重启服务' }}
-                        </button>
-                    </div>
                 </div>
-            </div>
-
-                <div class="token-stats-card">
-                    <div class="overview-header">
-                        <h3 class="overview-title">Token 使用统计</h3>
-                        <div class="period-selector">
-                            <button 
-                                v-for="period in tokenPeriods" 
-                                :key="period.value"
-                                :class="['period-btn', { active: tokenPeriod === period.value }]"
-                                @click="loadTokenStats(period.value)"
-                            >
-                                {{ period.label }}
-                            </button>
                         </div>
-                    </div>
-                    <div class="token-stats-summary">
+
+                        <div class="token-stats-card">
+                            <div class="overview-header">
+                                <h3 class="overview-title">Token 使用统计</h3>
+                                <div class="period-selector">
+                                    <button 
+                                        v-for="period in tokenPeriods" 
+                                        :key="period.value"
+                                        :class="['period-btn', { active: tokenPeriod === period.value }]"
+                                        @click="loadTokenStats(period.value)"
+                                    >
+                                        {{ period.label }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="token-stats-summary">
                         <div class="token-stat">
                             <span class="token-stat-value">{{ formatNumber(tokenStats.total_tokens) }}</span>
                             <span class="token-stat-label">Token 总数</span>
@@ -1777,234 +1807,469 @@ const ConfigPage = {
                             <span class="token-stat-value">{{ tokenStats.active_sessions }}</span>
                             <span class="token-stat-label">活跃会话</span>
                         </div>
+                        <div class="token-stat" v-if="tokenStats.estimated_cost">
+                            <span class="token-stat-value">$ {{ tokenStats.estimated_cost.toFixed(4) }}</span>
+                            <span class="token-stat-label">预估费用</span>
+                        </div>
                     </div>
                     <div class="token-model-stats" v-if="tokenStats.by_model && tokenStats.by_model.length > 0">
-                        <div class="model-stats-header">按模型统计</div>
+                        <div class="model-stats-header">模型使用统计</div>
                         <div class="model-stats-list">
                             <div class="model-stat-item" v-for="model in tokenStats.by_model" :key="model.model">
-                                <div class="model-stat-info">
-                                    <span class="model-name">{{ model.model }}</span>
-                                    <span class="model-sessions">{{ model.session_count }} 会话</span>
+                                <div class="model-stat-header">
+                                    <div class="model-stat-identity">
+                                        <span class="model-display-name">{{ model.display_name || model.model }}</span>
+                                        <span class="model-provider-badge">{{ model.provider }}</span>
+                                    </div>
+                                    <div class="model-stat-cost" v-if="model.estimated_cost > 0">
+                                        <span class="cost-value">$ {{ model.estimated_cost.toFixed(4) }}</span>
+                                    </div>
                                 </div>
-                                <div class="model-stat-values">
-                                    <span class="model-tokens">{{ formatNumber(model.total_tokens) }} Token</span>
-                                    <span class="model-requests">{{ model.request_count }} 次请求</span>
+                                <div class="model-stat-usage">
+                                    <div class="usage-info">
+                                        <span class="usage-tokens">{{ formatNumber(model.total_tokens) }} Token</span>
+                                        <span class="usage-breakdown">{{ formatNumber(model.total_prompt_tokens) }} 输入 / {{ formatNumber(model.total_completion_tokens) }} 输出</span>
+                                    </div>
+                                    <div class="usage-progress" v-if="model.max_tokens > 0">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" :style="{ width: Math.min(100, (model.total_tokens / model.max_tokens) * 100) + '%' }"></div>
+                                        </div>
+                                        <span class="progress-text">{{ Math.min(100, (model.total_tokens / model.max_tokens) * 100).toFixed(1) }}%</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                        </div>
+                    </div>
 
-            <div class="card">
-                    <div class="card-header"><h3 class="card-title">模型和供应商</h3></div>
-                    <div class="provider-list">
-                        <div v-for="provider in config.providers" :key="provider.name" class="provider-item">
-                            <div class="provider-info">
-                                <span class="provider-name">{{ provider.display_name || provider.name }}</span>
-                                <span v-if="provider.is_gateway" class="badge badge-info">网关</span>
-                                <span v-if="provider.is_oauth" class="badge badge-info">OAuth</span>
-                                <span v-if="provider.is_local" class="badge badge-info">本地</span>
-                                <span :class="['badge', provider.has_key ? 'badge-success' : 'badge-warning']">
-                                    {{ provider.has_key ? '已配置' : '未配置' }}
-                                </span>
-                                <span v-if="isCurrentProvider(provider.name)" class="badge badge-primary">当前</span>
+                    <div v-if="activeSection === 'model'" class="config-section">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">模型和供应商</h3></div>
+                            <div class="provider-list">
+                                <div v-for="provider in config.providers" :key="provider.name" class="provider-item-wrapper">
+                                    <div class="provider-header" @click="toggleProviderExpand(provider.name)">
+                                        <div class="provider-info">
+                                            <span class="provider-name">{{ provider.display_name || provider.name }}</span>
+                                            <span class="provider-desc" v-if="provider.description" :title="provider.description">{{ provider.description }}</span>
+                                            <span v-if="provider.is_gateway" class="badge badge-info">网关</span>
+                                            <span v-if="provider.is_oauth" class="badge badge-info">OAuth</span>
+                                            <span v-if="provider.is_local" class="badge badge-info">本地</span>
+                                            <span :class="['badge', provider.has_key ? 'badge-success' : 'badge-warning']">
+                                                {{ provider.has_key ? '已配置' : '未配置' }}
+                                            </span>
+                                            <span v-if="isCurrentProvider(provider.name)" class="badge badge-primary">当前</span>
+                                        </div>
+                                        <div class="provider-actions">
+                                            <span v-if="provider.models && provider.models.length > 0" class="model-count">
+                                                {{ provider.models.length }} 模型
+                                            </span>
+                                            <span class="expand-icon">
+                                        {{ expandedProvider === provider.name ? '▼' : '▶' }}
+                                    </span>
+                                    <button class="btn btn-sm btn-secondary" @click.stop="editProvider(provider)">
+                                        {{ provider.has_key ? '编辑' : '配置' }}
+                                    </button>
+                                </div>
                             </div>
-                            <div class="provider-actions">
-                                <button class="btn btn-sm btn-secondary" @click="editProvider(provider)">
-                                    {{ provider.has_key ? '编辑' : '配置' }}
+                            <div v-if="expandedProvider === provider.name" class="provider-models">
+                                <div v-for="model in provider.models" :key="model.model_id" :class="['model-card', { active: isCurrentModel(provider.name, model.model_id) }]">
+                                    <div class="model-card-header">
+                                        <div class="model-card-title">
+                                            <span class="model-card-name">{{ model.display_name || model.model_id }}</span>
+                                            <span v-if="isCurrentModel(provider.name, model.model_id)" class="badge badge-primary">当前</span>
+                                            <span v-if="model.status === 'beta'" class="badge badge-warning">Beta</span>
+                                            <span v-if="model.status === 'deprecated'" class="badge badge-error">已弃用</span>
+                                        </div>
+                                        <div class="model-card-actions">
+                                            <button v-if="!isCurrentModel(provider.name, model.model_id)" class="btn btn-xs btn-primary" @click="switchToModel(provider.name, model.model_id)" title="启用此模型">启用</button>
+                                            <button class="btn btn-xs btn-secondary" @click="editModel(provider.name, model)" title="编辑模型">编辑</button>
+                                            <button class="btn btn-xs btn-danger" @click="deleteModel(provider.name, model)" title="删除模型">删除</button>
+                                        </div>
+                                    </div>
+                                    <div class="model-card-body">
+                                        <span class="model-card-id">{{ model.model_id }}</span>
+                                        <span class="model-card-tokens" v-if="model.max_tokens">{{ formatTokensK(model.max_tokens) }}K 上下文</span>
+                                        <span v-if="model.supports_vision" class="capability-badge capability-vision" title="支持视觉/图片输入">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            视觉
+                                        </span>
+                                        <span v-if="model.supports_function_calling" class="capability-badge capability-tool" title="支持工具/函数调用">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                            工具
+                                        </span>
+                                        <span v-if="model.supports_streaming !== false" class="capability-badge capability-stream" title="支持流式输出">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                            流式
+                                        </span>
+                                        <span class="model-card-pricing" v-if="model.input_price || model.output_price">
+                                            <span v-if="model.input_price">输入: {{ model.currency === 'CNY' ? '¥' : '$' }}{{ model.input_price }}/1M</span>
+                                            <span v-if="model.output_price" style="margin-left: 0.5rem;">输出: {{ model.currency === 'CNY' ? '¥' : '$' }}{{ model.output_price }}/1M</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="add-model-card" @click="openAddModelModal(provider.name)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    <span>添加模型</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+
+                    <div v-if="activeSection === 'channel'" class="config-section">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">通道配置</h3></div>
+                            <div class="channel-list">
+                                <div v-for="channel in config.channels" :key="channel.name" class="channel-item">
+                                    <div class="channel-info">
+                                        <span class="channel-name">{{ channel.display_name }}</span>
+                                        <span class="channel-desc" :title="channel.description">{{ channel.description }}</span>
+                                        <span :class="['badge', channel.enabled ? 'badge-success' : 'badge-warning']">
+                                            {{ channel.enabled ? '已启用' : '未启用' }}
+                                        </span>
+                                    </div>
+                                    <div class="channel-actions">
+                                        <button class="btn btn-sm btn-secondary" @click="editChannel(channel)">
+                                            {{ channel.has_credentials ? '编辑' : '配置' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="activeSection === 'agent'" class="config-section">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Agent 默认配置</h3></div>
+                            <div class="form-group">
+                                <label class="form-label">最大 Token</label>
+                                <input class="input" type="number" v-model.number="agentDefaults.max_tokens" @change="saveAgentDefaults">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">温度 (Temperature)</label>
+                                <input class="input" :class="{ error: validationErrors.temperature }" type="number" step="0.1" min="0" max="2" v-model.number="agentDefaults.temperature" @change="saveAgentDefaults">
+                                <p v-if="validationErrors.temperature" class="form-error">{{ validationErrors.temperature }}</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">最大工具迭代次数</label>
+                                <input class="input" :class="{ error: validationErrors.max_tool_iterations }" type="number" v-model.number="agentDefaults.max_tool_iterations" @change="saveAgentDefaults">
+                                <p v-if="validationErrors.max_tool_iterations" class="form-error">{{ validationErrors.max_tool_iterations }}</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">记忆窗口大小</label>
+                                <input class="input" :class="{ error: validationErrors.memory_window }" type="number" v-model.number="agentDefaults.memory_window" @change="saveAgentDefaults">
+                                <p v-if="validationErrors.memory_window" class="form-error">{{ validationErrors.memory_window }}</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">工作目录</label>
+                                <input class="input" v-model="agentDefaults.workspace" @change="saveAgentDefaults">
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">子代理配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="subagent.enabled" @change="saveSubagent">
+                                    <span class="toggle-label">启用子代理</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">最大并发数</label>
+                                <input class="input" :class="{ error: validationErrors.max_concurrent }" type="number" v-model.number="subagent.max_concurrent" @change="saveSubagent">
+                                <p v-if="validationErrors.max_concurrent" class="form-error">{{ validationErrors.max_concurrent }}</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">默认超时 (秒)</label>
+                                <input class="input" :class="{ error: validationErrors.default_timeout }" type="number" v-model.number="subagent.default_timeout" @change="saveSubagent">
+                                <p v-if="validationErrors.default_timeout" class="form-error">{{ validationErrors.default_timeout }}</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="subagent.workspace_isolation" @change="saveSubagent">
+                                    <span class="toggle-label">工作空间隔离</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="activeSection === 'knowledge'" class="config-section">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">知识检索配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="config.knowledge.enabled" @change="toggleKnowledge">
+                                    <span class="toggle-label">启用向量检索</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                            <template v-if="config.knowledge.enabled">
+                                <div class="form-group">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" v-model="config.knowledge.use_graph" @change="saveKnowledge">
+                                        <span class="toggle-label">启用知识图谱</span>
+                                        <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                    </label>
+                                    <p class="form-hint">启用实体检索和关系推理</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" v-model="config.knowledge.use_llm_extract" @change="saveKnowledge">
+                                        <span class="toggle-label">启用实体抽取</span>
+                                        <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                    </label>
+                                    <p class="form-hint">使用 LLM 增强实体识别</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">嵌入模型</label>
+                                    <input class="input" :value="config.knowledge.embedding_model" disabled>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">持久化目录</label>
+                                    <input class="input" :value="config.knowledge.persist_dir" disabled>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">分块大小</label>
+                                    <input class="input" type="number" v-model.number="config.knowledge.chunk_size" @change="saveKnowledge">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">分块重叠</label>
+                                    <input class="input" type="number" v-model.number="config.knowledge.chunk_overlap" @change="saveKnowledge">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">默认返回数量 (Top K)</label>
+                                    <input class="input" type="number" v-model.number="config.knowledge.default_top_k" @change="saveKnowledge">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div v-if="activeSection === 'system'" class="config-section">
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">上传配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="upload.enabled" @change="saveUpload">
+                                    <span class="toggle-label">启用文件上传</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">最大文件大小 (MB)</label>
+                                <input class="input" type="number" v-model.number="uploadMaxSizeMB" @change="saveUploadMaxSize" min="1" max="1000">
+                                <p class="form-hint">限制上传文件的最大大小</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Gateway 服务配置</h3></div>
+                            <div class="form-group">
+                                <label class="form-label">服务地址</label>
+                                <input class="input" v-model="gateway.host" @change="saveGateway">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">服务端口</label>
+                                <input class="input" type="number" v-model.number="gateway.port" @change="saveGateway">
+                            </div>
+                            <p class="form-hint">Gateway 服务配置更改后需要重启才能生效。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">Web UI 配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="gateway.web_ui_enabled" @change="saveWebUI">
+                                    <span class="toggle-label">启用 Web UI</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Web UI 端口</label>
+                                <input class="input" type="number" v-model.number="gateway.web_ui_port" @change="saveWebUI">
+                            </div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="gateway.web_ui_auth_enabled" @change="saveWebUI">
+                                    <span class="toggle-label">启用认证</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                            </div>
+                            <p class="form-hint">Web UI 配置更改后需要重启才能生效。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">思考与工具配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="agentDefaults.enable_reasoning" @change="saveAgentDefaults">
+                                    <span class="toggle-label">启用思考过程展示</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                                <p class="form-hint">在对话中展示模型的思考过程（如 DeepSeek R1 的推理步骤）</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" :checked="agentDefaults.max_tool_iterations > 0" @change="toggleToolCalling">
+                                    <span class="toggle-label">启用工具调用</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                                <p class="form-hint">允许模型调用工具执行操作（如文件操作、网络搜索等）</p>
+                            </div>
+                            <div class="form-group" v-if="agentDefaults.max_tool_iterations > 0">
+                                <label class="form-label">最大工具迭代次数</label>
+                                <input class="input" type="number" v-model.number="agentDefaults.max_tool_iterations" @change="saveAgentDefaults" min="1" max="50">
+                                <p class="form-hint">工具调用的最大迭代次数，防止无限循环</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">工具配置</h3></div>
+                            <div class="form-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" v-model="toolsConfig.restrict_to_workspace" @change="saveToolsConfig">
+                                    <span class="toggle-label">限制工作空间</span>
+                                    <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
+                                </label>
+                                <p class="form-hint">限制文件操作只能在指定工作目录内进行</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Shell 执行超时 (秒)</label>
+                                <input class="input" type="number" v-model.number="toolsConfig.exec_timeout" @change="saveToolsConfig">
+                            </div>
+                            <div class="tool-item">
+                                <div class="tool-info">
+                                    <span class="tool-name">博查搜索 (网络搜索)</span>
+                                    <span :class="['badge', config.tools?.web_search_api_key ? 'badge-success' : 'badge-warning']">
+                                        {{ config.tools?.web_search_api_key ? '已配置' : '未配置' }}
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-secondary" @click="editTool('web_search')">
+                                    {{ config.tools?.web_search_api_key ? '编辑' : '配置' }}
                                 </button>
-                                <button v-if="provider.has_key && !isCurrentProvider(provider.name)" class="btn btn-sm btn-primary" @click="switchToProvider(provider)">启用</button>
+                            </div>
+                            <div class="tool-item">
+                                <div class="tool-info">
+                                    <span class="tool-name">心知天气 (天气查询)</span>
+                                    <span :class="['badge', config.tools?.weather_api_key ? 'badge-success' : 'badge-warning']">
+                                        {{ config.tools?.weather_api_key ? '已配置' : '未配置' }}
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-secondary" @click="editTool('weather')">
+                                    {{ config.tools?.weather_api_key ? '编辑' : '配置' }}
+                                </button>
+                            </div>
+                            <div class="tool-item">
+                                <div class="tool-info">
+                                    <span class="tool-name">MCP 服务器</span>
+                                    <span class="badge badge-info">{{ toolsConfig.mcp_servers_count || 0 }} 个</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Agent 默认配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">最大 Token</label>
-                        <input class="input" type="number" v-model.number="agentDefaults.max_tokens" @change="saveAgentDefaults">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">温度 (Temperature)</label>
-                        <input class="input" :class="{ error: validationErrors.temperature }" type="number" step="0.1" min="0" max="2" v-model.number="agentDefaults.temperature" @change="saveAgentDefaults">
-                        <p v-if="validationErrors.temperature" class="form-error">{{ validationErrors.temperature }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">最大工具迭代次数</label>
-                        <input class="input" :class="{ error: validationErrors.max_tool_iterations }" type="number" v-model.number="agentDefaults.max_tool_iterations" @change="saveAgentDefaults">
-                        <p v-if="validationErrors.max_tool_iterations" class="form-error">{{ validationErrors.max_tool_iterations }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">记忆窗口大小</label>
-                        <input class="input" :class="{ error: validationErrors.memory_window }" type="number" v-model.number="agentDefaults.memory_window" @change="saveAgentDefaults">
-                        <p v-if="validationErrors.memory_window" class="form-error">{{ validationErrors.memory_window }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">工作目录</label>
-                        <input class="input" v-model="agentDefaults.workspace" @change="saveAgentDefaults">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">子代理配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="subagent.enabled" @change="saveSubagent"> 启用子代理
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">最大并发数</label>
-                        <input class="input" :class="{ error: validationErrors.max_concurrent }" type="number" v-model.number="subagent.max_concurrent" @change="saveSubagent">
-                        <p v-if="validationErrors.max_concurrent" class="form-error">{{ validationErrors.max_concurrent }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">默认超时 (秒)</label>
-                        <input class="input" :class="{ error: validationErrors.default_timeout }" type="number" v-model.number="subagent.default_timeout" @change="saveSubagent">
-                        <p v-if="validationErrors.default_timeout" class="form-error">{{ validationErrors.default_timeout }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="subagent.workspace_isolation" @change="saveSubagent"> 工作空间隔离
-                        </label>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">知识检索配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label"><input type="checkbox" v-model="config.knowledge.enabled" @change="toggleKnowledge"> 启用向量检索</label>
-                    </div>
-                    <template v-if="config.knowledge.enabled">
-                        <div class="form-group">
-                            <label class="form-label"><input type="checkbox" v-model="config.knowledge.use_graph" @change="saveKnowledge"> 启用知识图谱</label>
-                            <p class="form-hint">启用实体检索和关系推理</p>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><input type="checkbox" v-model="config.knowledge.use_llm_extract" @change="saveKnowledge"> 启用实体抽取</label>
-                            <p class="form-hint">自动从笔记中抽取实体和关系</p>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">嵌入模型</label>
-                            <input class="input" :value="config.knowledge.embedding_model" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">持久化目录</label>
-                            <input class="input" :value="config.knowledge.persist_dir" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">分块大小</label>
-                            <input class="input" type="number" v-model.number="config.knowledge.chunk_size" @change="saveKnowledge">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">分块重叠</label>
-                            <input class="input" type="number" v-model.number="config.knowledge.chunk_overlap" @change="saveKnowledge">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">默认返回数量 (Top K)</label>
-                            <input class="input" type="number" v-model.number="config.knowledge.default_top_k" @change="saveKnowledge">
-                        </div>
-                    </template>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">上传配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="upload.enabled" @change="saveUpload"> 启用文件上传
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">最大文件大小 (字节)</label>
-                        <input class="input" type="number" v-model.number="upload.max_file_size" @change="saveUpload">
-                        <p class="form-hint">当前: {{ formatSize(upload.max_file_size) }}</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Gateway 服务配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">服务地址</label>
-                        <input class="input" v-model="gateway.host" @change="saveGateway">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">服务端口</label>
-                        <input class="input" type="number" v-model.number="gateway.port" @change="saveGateway">
-                    </div>
-                    <p class="form-hint">Gateway 服务配置更改后需要重启才能生效。</p>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Web UI 配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="gateway.web_ui_enabled" @change="saveWebUI"> 启用 Web UI
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Web UI 端口</label>
-                        <input class="input" type="number" v-model.number="gateway.web_ui_port" @change="saveWebUI">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="gateway.web_ui_auth_enabled" @change="saveWebUI"> 启用认证
-                        </label>
-                    </div>
-                    <p class="form-hint">Web UI 配置更改后需要重启才能生效。</p>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">工具配置</h3></div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" v-model="toolsConfig.restrict_to_workspace" @change="saveToolsConfig"> 限制工作空间
-                        </label>
-                        <p class="form-hint">限制文件操作只能在指定工作目录内进行</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Shell 执行超时 (秒)</label>
-                        <input class="input" type="number" v-model.number="toolsConfig.exec_timeout" @change="saveToolsConfig">
-                    </div>
-                    <div class="tool-item">
-                        <div class="tool-info">
-                            <span class="tool-name">博查搜索 (网络搜索)</span>
-                            <span :class="['badge', config.tools?.web_search_api_key ? 'badge-success' : 'badge-warning']">
-                                {{ config.tools?.web_search_api_key ? '已配置' : '未配置' }}
-                            </span>
-                        </div>
-                        <button class="btn btn-sm btn-secondary" @click="editTool('web_search')">
-                            {{ config.tools?.web_search_api_key ? '编辑' : '配置' }}
-                        </button>
-                    </div>
-                    <div class="tool-item">
-                        <div class="tool-info">
-                            <span class="tool-name">心知天气 (天气查询)</span>
-                            <span :class="['badge', config.tools?.weather_api_key ? 'badge-success' : 'badge-warning']">
-                                {{ config.tools?.weather_api_key ? '已配置' : '未配置' }}
-                            </span>
-                        </div>
-                        <button class="btn btn-sm btn-secondary" @click="editTool('weather')">
-                            {{ config.tools?.weather_api_key ? '编辑' : '配置' }}
-                        </button>
-                    </div>
-                    <div class="tool-item">
-                        <div class="tool-info">
-                            <span class="tool-name">MCP 服务器</span>
-                            <span class="badge badge-info">{{ toolsConfig.mcp_servers_count || 0 }} 个</span>
+                        <div class="card">
+                            <div class="card-header"><h3 class="card-title">服务管理</h3></div>
+                            <p class="form-hint" style="margin-bottom: 1rem;">⚠️ Gateway端口、Web UI端口等配置更改后需要重启服务才能生效。</p>
+                            <button class="btn btn-primary" @click="restartService" :disabled="restarting" style="width: 100%;">
+                                {{ restarting ? '重启中...' : '重启服务' }}
+                            </button>
                         </div>
                     </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">通信渠道</h3></div>
-                    <div v-for="channel in config.channels" :key="channel.name" class="channel-item">
-                        <div class="channel-info">
-                            <span class="channel-name">{{ channel.display_name || channel.name }}</span>
-                            <span :class="['badge', channel.enabled ? 'badge-success' : 'badge-warning']">
-                                {{ channel.enabled ? '已启用' : '未启用' }}
-                            </span>
-                        </div>
-                        <button class="btn btn-sm btn-secondary" @click="editChannel(channel)">
-                            {{ channel.has_credentials ? '编辑' : '配置' }}
-                        </button>
-                    </div>
-                </div>
                 </div>
             </div>
-            <div class="modal-overlay" v-if="editingProvider" @click.self="editingProvider = null">
-                <div class="modal modal-lg">
+            <div class="modal-overlay" v-if="addingModelToProvider">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">{{ newModel.is_editing ? '编辑模型' : '添加模型' }}</h3>
+                        <button class="btn-icon" @click="addingModelToProvider = null">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="form-label">模型ID <span class="form-required">*</span></label>
+                            <input class="input" v-model="newModel.model_id" placeholder="例如: gpt-4o-mini">
+                            <p class="form-hint">模型在API调用时使用的标识符</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">显示名称</label>
+                            <input class="input" v-model="newModel.display_name" placeholder="例如: GPT-4o Mini">
+                            <p class="form-hint">可选，用于界面显示的友好名称</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">描述</label>
+                            <input class="input" v-model="newModel.description" placeholder="模型的简短描述">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">上下文窗口 (K)</label>
+                                <input class="input" type="number" v-model.number="newModel.max_tokens_k" placeholder="4" step="0.1" min="1">
+                                <p class="form-hint">最大Token数，单位K (如: 128 表示 128K)</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">状态</label>
+                                <select class="input" v-model="newModel.status">
+                                    <option value="active">正常</option>
+                                    <option value="beta">测试版</option>
+                                    <option value="deprecated">已弃用</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-label-with-action">
+                                <label class="form-label">定价 (每 1M Tokens)</label>
+                                <button type="button" class="currency-toggle" @click="newModel.currency = newModel.currency === 'CNY' ? 'USD' : 'CNY'">
+                                    {{ newModel.currency === 'CNY' ? '¥ 人民币' : '$ 美元' }}
+                                </button>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1;">
+                                    <input class="input" type="number" step="0.01" v-model.number="newModel.input_price" placeholder="输入价格">
+                                    <p class="form-hint">输入Token价格</p>
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <input class="input" type="number" step="0.01" v-model.number="newModel.output_price" placeholder="输出价格">
+                                    <p class="form-hint">输出Token价格</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Token 配额</label>
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1;">
+                                    <input class="input" type="number" v-model.number="newModel.token_quota" placeholder="0">
+                                    <p class="form-hint">可用Token总量 (单位: K)</p>
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <input class="input" type="number" v-model.number="newModel.token_used" placeholder="0" disabled>
+                                    <p class="form-hint">已使用 (自动统计)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">模型能力</label>
+                            <div class="capability-grid">
+                                <label class="capability-item" :class="{ active: newModel.supports_vision }">
+                                    <input type="checkbox" v-model="newModel.supports_vision">
+                                    <svg class="capability-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <span>视觉</span>
+                                </label>
+                                <label class="capability-item" :class="{ active: newModel.supports_function_calling }">
+                                    <input type="checkbox" v-model="newModel.supports_function_calling">
+                                    <svg class="capability-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                    <span>工具调用</span>
+                                </label>
+                                <label class="capability-item" :class="{ active: newModel.supports_streaming }">
+                                    <input type="checkbox" v-model="newModel.supports_streaming">
+                                    <svg class="capability-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                    <span>流式输出</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @click="addingModelToProvider = null">取消</button>
+                        <button class="btn btn-primary" @click="saveNewModel">{{ newModel.is_editing ? '保存修改' : '添加模型' }}</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-overlay" v-if="editingProvider">
+                <div class="modal">
                     <div class="modal-header">
                         <h3 class="modal-title">配置 {{ editingProvider.display_name || editingProvider.name }}</h3>
                         <button class="btn-icon" @click="editingProvider = null">✕</button>
@@ -2021,47 +2286,26 @@ const ConfigPage = {
                             <label class="form-label">API Base (可选)</label>
                             <input class="input" v-model="providerForm.apiBase" :placeholder="editingProvider.api_base || '使用默认地址'">
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">选择模型</label>
-                            <div v-if="recentModels.length > 0" class="recent-models">
-                                <div class="recent-models-header">最近使用</div>
-                                <div class="recent-models-list">
-                                    <div v-for="item in recentModels" :key="item.model" 
-                                         :class="['recent-model-item', { active: selectedModel === item.model }]" 
-                                         @click="selectRecentModel(item.model)">
-                                        {{ getModelDisplayName(item.model) }}
-                                    </div>
-                                </div>
+                        <div class="test-connection-result" v-if="testConnectionResult">
+                            <div :class="['test-status', testConnectionResult.success ? 'success' : 'error']">
+                                <span class="status-icon">{{ testConnectionResult.success ? '✓' : '✗' }}</span>
+                                <span class="status-message">{{ testConnectionResult.message }}</span>
+                                <span class="status-latency" v-if="testConnectionResult.success && testConnectionResult.latency_ms">
+                                    ({{ testConnectionResult.latency_ms }}ms)
+                                </span>
                             </div>
-                            <div class="model-list">
-                                <div v-for="model in filteredModels" :key="model" :class="['model-item', { active: selectedModel === model }]" @click="selectedModel = model">
-                                    {{ getModelDisplayName(model) }}
-                                    <span v-if="selectedModel === model" class="check">✓</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">自定义模型</label>
-                            <div class="custom-model-input">
-                                <input class="input" v-model="customModel" placeholder="输入自定义模型名称">
-                                <button class="btn btn-secondary" @click="addCustomModel" type="button">添加</button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">
-                                <input type="checkbox" v-model="enableReasoning"> 
-                                启用思考过程显示
-                            </label>
-                            <p class="form-hint">开启后，如果模型支持，将显示 AI 的思考过程</p>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" @click="editingProvider = null">取消</button>
+                        <button class="btn btn-outline" @click="testProvider" :disabled="testingConnection">
+                            {{ testingConnection ? '测试中...' : '测试连接' }}
+                        </button>
                         <button class="btn btn-primary" @click="saveProvider">保存</button>
                     </div>
                 </div>
             </div>
-            <div class="modal-overlay" v-if="editingChannel" @click.self="editingChannel = null">
+            <div class="modal-overlay" v-if="editingChannel">
                 <div class="modal">
                     <div class="modal-header">
                         <h3 class="modal-title">配置 {{ editingChannel.display_name || editingChannel.name }}</h3>
@@ -2162,8 +2406,10 @@ const ConfigPage = {
                             </div>
                         </template>
                         <div class="form-group">
-                            <label class="form-label">
-                                <input type="checkbox" v-model="channelForm.enabled"> 启用此通道
+                            <label class="toggle-switch">
+                                <input type="checkbox" v-model="channelForm.enabled">
+                                <span class="toggle-label">启用此通道</span>
+                                <span class="toggle-slider"><span class="toggle-text-on">开启</span><span class="toggle-text-off">关闭</span></span>
                             </label>
                         </div>
                     </div>
@@ -2173,7 +2419,7 @@ const ConfigPage = {
                     </div>
                 </div>
             </div>
-            <div class="modal-overlay" v-if="editingTool" @click.self="editingTool = null">
+            <div class="modal-overlay" v-if="editingTool">
                 <div class="modal">
                     <div class="modal-header">
                         <h3 class="modal-title">配置 {{ getToolName(editingTool) }}</h3>
@@ -2195,6 +2441,7 @@ const ConfigPage = {
     `,
   data() {
     return {
+      activeSection: "overview",
       config: {
         model: { current: "", available: [] },
         providers: [],
@@ -2246,6 +2493,8 @@ const ConfigPage = {
       editingChannel: null,
       editingTool: null,
       providerForm: { apiKey: "", apiBase: "" },
+      testingConnection: false,
+      testConnectionResult: null,
       channelForm: {
         appId: "",
         appSecret: "",
@@ -2277,6 +2526,20 @@ const ConfigPage = {
         { label: "本月", value: "month" },
         { label: "全部", value: "all" },
       ],
+      expandedProvider: null,
+      addingModelToProvider: null,
+      newModel: {
+        model_id: "",
+        display_name: "",
+        description: "",
+        max_tokens: 4096,
+        supports_vision: false,
+        supports_function_calling: true,
+        supports_streaming: true,
+        input_price: 0,
+        output_price: 0,
+        status: "active",
+      },
     };
   },
   computed: {
@@ -2304,6 +2567,14 @@ const ConfigPage = {
         (m) => m.startsWith(providerName + "/") || m === providerName,
       );
       return [...builtIn, ...this.customModels];
+    },
+    uploadMaxSizeMB: {
+      get() {
+        return Math.round((this.upload.max_file_size || 10485760) / 1048576);
+      },
+      set(value) {
+        this.upload.max_file_size = (value || 10) * 1048576;
+      },
     },
   },
   mounted() {
@@ -2380,15 +2651,54 @@ const ConfigPage = {
       if (current.includes("/")) {
         return current.split("/")[0] === providerName;
       }
-      const provider = this.config.providers.find(
-        (p) => p.name === providerName,
-      );
+      return false;
+    },
+    isCurrentModel(providerName, modelId) {
+      const current = this.config.model.current || "";
+      const expectedPrefix = `${providerName}/`;
       return (
-        provider &&
-        provider.has_key &&
-        provider.enabled &&
-        !current.includes("/")
+        current === expectedPrefix + modelId ||
+        current === providerName + "/" + modelId
       );
+    },
+    async switchToModel(providerName, modelId) {
+      const model = `${providerName}/${modelId}`;
+      try {
+        await API.config.setModel(model);
+        this.$root.showToast("已切换到 " + modelId);
+        await this.loadConfig();
+      } catch (e) {
+        this.$root.showToast("切换失败: " + e.message, "error");
+      }
+    },
+    toggleProviderExpand(providerName) {
+      if (this.expandedProvider === providerName) {
+        this.expandedProvider = null;
+      } else {
+        this.expandedProvider = providerName;
+      }
+    },
+    formatTokens(tokens) {
+      if (!tokens || tokens === 0) return "0";
+      if (tokens >= 1000000) {
+        return (tokens / 1000000).toFixed(1) + "M";
+      }
+      if (tokens >= 1000) {
+        return (tokens / 1000).toFixed(0) + "K";
+      }
+      return tokens.toString();
+    },
+    formatTokensK(tokens) {
+      if (!tokens || tokens === 0) return "0";
+      return (tokens / 1024).toFixed(1);
+    },
+    formatPrice(price) {
+      if (price === undefined || price === null) return "0.00";
+      return price.toFixed(2);
+    },
+    formatScore(score) {
+      if (score === undefined || score === null) return "0.0";
+      return (score * 100).toFixed(1);
     },
     getChannelStatusClass(channel) {
       if (channel.enabled && channel.has_credentials) return "status-online";
@@ -2407,6 +2717,7 @@ const ConfigPage = {
         apiBase: provider.api_base || "",
       };
       this.selectedModel = this.config.model.current;
+      this.testConnectionResult = null;
     },
     addCustomModel() {
       const modelName = this.customModel.trim();
@@ -2416,6 +2727,96 @@ const ConfigPage = {
         }
         this.selectedModel = modelName;
         this.customModel = "";
+      }
+    },
+    editModel(providerName, model) {
+      this.addingModelToProvider = providerName;
+      const maxTokens = model.max_tokens || 4096;
+      this.newModel = {
+        model_id: model.model_id,
+        display_name: model.display_name || "",
+        description: model.description || "",
+        max_tokens_k: Math.round((maxTokens / 1024) * 10) / 10,
+        supports_vision: model.supports_vision || false,
+        supports_function_calling: model.supports_function_calling !== false,
+        supports_streaming: model.supports_streaming !== false,
+        input_price: model.input_price || 0,
+        output_price: model.output_price || 0,
+        status: model.status || "active",
+        currency: model.currency || "CNY",
+        token_quota: model.token_quota || 0,
+        token_used: model.token_used || 0,
+        is_editing: true,
+      };
+    },
+    async deleteModel(providerName, model) {
+      this.$root.showConfirm(
+        "删除模型",
+        `确定要删除模型 "${model.display_name || model.model_id}" 吗？`,
+        async () => {
+          try {
+            await API.config.deleteModel(providerName, model.model_id);
+            this.$root.showToast("模型已删除");
+            await this.loadConfig();
+          } catch (e) {
+            this.$root.showToast("删除失败: " + e.message, "error");
+          }
+        },
+      );
+    },
+    openAddModelModal(providerName) {
+      this.addingModelToProvider = providerName;
+      this.newModel = {
+        model_id: "",
+        display_name: "",
+        description: "",
+        max_tokens_k: 4,
+        supports_vision: false,
+        supports_function_calling: true,
+        supports_streaming: true,
+        input_price: 0,
+        output_price: 0,
+        status: "active",
+        currency: "CNY",
+        token_quota: 0,
+        token_used: 0,
+      };
+    },
+    async saveNewModel() {
+      if (!this.newModel.model_id.trim()) {
+        this.$root.showToast("请输入模型ID", "error");
+        return;
+      }
+
+      try {
+        const modelConfig = {
+          model_id: this.newModel.model_id.trim(),
+          display_name: this.newModel.display_name || "",
+          description: this.newModel.description || "",
+          max_tokens: Math.round((this.newModel.max_tokens_k || 4) * 1024),
+          supports_vision: this.newModel.supports_vision || false,
+          supports_function_calling:
+            this.newModel.supports_function_calling !== false,
+          supports_streaming: this.newModel.supports_streaming !== false,
+          input_price: this.newModel.input_price || 0,
+          output_price: this.newModel.output_price || 0,
+          status: this.newModel.status || "active",
+          currency: this.newModel.currency || "CNY",
+          token_quota: this.newModel.token_quota || 0,
+          token_used: this.newModel.token_used || 0,
+        };
+
+        await API.config.saveCustomModel(
+          this.addingModelToProvider,
+          modelConfig,
+        );
+        this.$root.showToast(
+          this.newModel.is_editing ? "模型已更新" : "模型已添加",
+        );
+        this.addingModelToProvider = null;
+        await this.loadConfig();
+      } catch (e) {
+        this.$root.showToast("操作失败: " + e.message, "error");
       }
     },
     selectRecentModel(model) {
@@ -2454,26 +2855,38 @@ const ConfigPage = {
         this.$root.showToast("保存失败: " + e.message, "error");
       }
     },
-    async switchToProvider(provider) {
-      const models = {
-        openai: "openai/gpt-4o-mini",
-        anthropic: "anthropic/claude-3-haiku-20240307",
-        deepseek: "deepseek/deepseek-chat",
-        zhipu: "zhipu/glm-4-flash",
-        moonshot: "moonshot/moonshot-v1-8k",
-        minimax: "minimax/abab6.5s-chat",
-        openrouter: "openrouter/auto",
-        groq: "groq/llama-3.1-8b-instant",
-        dashscope: "dashscope/qwen-turbo",
-        siliconflow: "siliconflow/Qwen/Qwen2.5-7B-Instruct",
-      };
-      const model = models[provider.name] || `${provider.name}/default`;
+    async testProvider() {
+      const apiKeyToTest = this.providerForm.apiKey
+        ? this.providerForm.apiKey.trim()
+        : null;
+      if (!apiKeyToTest && !this.editingProvider.has_key) {
+        this.$root.showToast("请先输入 API Key", "error");
+        return;
+      }
+      this.testingConnection = true;
+      this.testConnectionResult = null;
       try {
-        await API.config.setModel(model);
-        this.$root.showToast("已切换到 " + provider.name);
-        await this.loadConfig();
+        if (apiKeyToTest || this.providerForm.apiBase) {
+          await API.config.setProviderKey(
+            this.editingProvider.name,
+            apiKeyToTest,
+            this.providerForm.apiBase || null,
+          );
+        }
+        const result = await API.config.testProviderConnection(
+          this.editingProvider.name,
+        );
+        this.testConnectionResult = result;
+        if (result.success) {
+          this.$root.showToast("连接成功");
+        }
       } catch (e) {
-        this.$root.showToast("切换失败: " + e.message, "error");
+        this.testConnectionResult = {
+          success: false,
+          message: e.message || "测试失败",
+        };
+      } finally {
+        this.testingConnection = false;
       }
     },
     editChannel(channel) {
@@ -2579,7 +2992,9 @@ const ConfigPage = {
         return;
       }
       try {
-        await API.config.setToolConfig(this.editingTool, this.toolForm);
+        await API.config.setToolConfig(this.editingTool, {
+          api_key: this.toolForm.apiKey,
+        });
         this.$root.showToast("保存成功");
         this.editingTool = null;
         await this.loadConfig();
@@ -2597,6 +3012,14 @@ const ConfigPage = {
         this.$root.showToast("操作失败: " + e.message, "error");
       }
     },
+    async toggleToolCalling(event) {
+      if (event.target.checked) {
+        this.agentDefaults.max_tool_iterations = 10;
+      } else {
+        this.agentDefaults.max_tool_iterations = 0;
+      }
+      await this.saveAgentDefaults();
+    },
     async saveAgentDefaults() {
       this.validationErrors = {};
       if (
@@ -2608,10 +3031,7 @@ const ConfigPage = {
         return;
       }
       if (this.agentDefaults.max_tool_iterations < 1) {
-        this.validationErrors.max_tool_iterations =
-          "最大工具迭代次数必须大于 0";
-        this.$root.showToast("最大工具迭代次数必须大于 0", "error");
-        return;
+        this.agentDefaults.max_tool_iterations = 0;
       }
       if (this.agentDefaults.memory_window < 1) {
         this.validationErrors.memory_window = "记忆窗口大小必须大于 0";
@@ -2660,6 +3080,18 @@ const ConfigPage = {
           body: JSON.stringify(this.upload),
         });
         this.$root.showToast("上传配置已保存");
+      } catch (e) {
+        this.$root.showToast("保存失败: " + e.message, "error");
+      }
+    },
+    async saveUploadMaxSize() {
+      try {
+        await fetch("/api/config/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ max_file_size: this.upload.max_file_size }),
+        });
+        this.$root.showToast("最大文件大小已保存");
       } catch (e) {
         this.$root.showToast("保存失败: " + e.message, "error");
       }
@@ -2784,7 +3216,7 @@ const App = {
   template: `
         <div id="app-inner">
             <!-- Confirm Modal -->
-            <div class="modal-overlay" v-if="confirmModal.show" @click.self="confirmModal.show = false">
+            <div class="modal-overlay" v-if="confirmModal.show">
                 <div class="confirm-modal">
                     <div class="confirm-icon">⚠️</div>
                     <h3 class="confirm-title">{{ confirmModal.title }}</h3>

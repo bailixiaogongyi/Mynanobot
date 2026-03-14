@@ -381,11 +381,27 @@ const API = {
       return API.post("/config/model", payload);
     },
 
+    async deleteModel(provider, modelId) {
+      return API.delete(`/config/provider/${provider}/models/custom/${encodeURIComponent(modelId)}`);
+    },
+
+    async saveCustomModel(provider, modelConfig) {
+      return API.post(`/config/provider/${provider}/models/custom`, modelConfig);
+    },
+
+    async getCustomModels(provider) {
+      return API.get(`/config/provider/${provider}/models/custom`);
+    },
+
     async setProviderKey(provider, apiKey, apiBase = null) {
       return API.post(`/config/provider/${provider}`, {
         api_key: apiKey,
         api_base: apiBase,
       });
+    },
+
+    async testProviderConnection(provider) {
+      return API.post(`/config/provider/${provider}/test`);
     },
 
     async setChannelConfig(channel, config) {
