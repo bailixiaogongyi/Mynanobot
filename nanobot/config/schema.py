@@ -339,6 +339,16 @@ class ExecToolConfig(Base):
     timeout: int = 60
 
 
+class ImageGenerationConfig(Base):
+    """Image generation tools configuration."""
+
+    enabled: bool = False
+    provider: str = "dashscope"  # dashscope, openai, baidu, custom
+    model: str = "wan21-turbo"
+    api_key: str = ""
+    api_base: str = ""
+
+
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
 
@@ -395,6 +405,7 @@ class ToolsConfig(Base):
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     weather: WeatherToolsConfig = Field(default_factory=WeatherToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
+    image_generation: ImageGenerationConfig = Field(default_factory=ImageGenerationConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)

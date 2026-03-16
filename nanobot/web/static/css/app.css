@@ -1558,6 +1558,73 @@ body {
   border-left: 3px solid #10b981;
 }
 
+/* 图片内嵌展示样式 */
+.image-attachment-container {
+  margin-bottom: 0.5rem;
+}
+
+.image-link {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.message-image {
+  max-width: 100%;
+  max-height: 400px;
+  display: block;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s ease;
+  object-fit: contain;
+}
+
+.message-attachments {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.image-attachment-container {
+  max-width: 100%;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.message-image:hover {
+  transform: scale(1.02);
+}
+
+.image-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: 2rem 0.5rem 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-align: center;
+}
+
+.image-link:hover .image-overlay {
+  opacity: 1;
+}
+
+.download-hint {
+  color: white;
+  font-size: 0.75rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.image-caption {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
 .attachment-item.document {
   border-left: 3px solid #3b82f6;
 }
@@ -2176,6 +2243,49 @@ body {
   flex-direction: column;
   overflow-y: auto;
   flex-shrink: 0;
+  transition:
+    width 0.3s ease,
+    min-width 0.3s ease;
+}
+
+.sidebar-collapsed .config-sidebar {
+  width: 60px;
+  min-width: 60px;
+}
+
+.sidebar-collapsed .sidebar-title,
+.sidebar-collapsed .sidebar-item span {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding: 0.6rem 0.5rem;
+}
+
+.sidebar-collapsed .sidebar-icon {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .config-sidebar {
+    width: 60px;
+    min-width: 60px;
+  }
+
+  .sidebar-title,
+  .sidebar-item span {
+    display: none;
+  }
+
+  .sidebar-item {
+    justify-content: center;
+    padding: 0.6rem 0.5rem;
+  }
+
+  .sidebar-icon {
+    margin: 0;
+  }
 }
 
 .sidebar-section {
@@ -2267,13 +2377,21 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  background: var(--bg-color);
+  transition: all 0.2s;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.provider-item:hover,
+.channel-item:hover {
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .provider-item:last-child,
 .channel-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .provider-info,
@@ -2283,13 +2401,12 @@ body {
   gap: 0.75rem;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .provider-name,
 .channel-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-primary);
+  font-weight: 500;
   flex-shrink: 0;
 }
 
@@ -2298,14 +2415,24 @@ body {
   font-size: 0.75rem;
   flex: 1;
   min-width: 0;
-  max-width: 150px;
+  max-width: 200px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: default;
 }
 
 .channel-info .badge {
   margin-left: auto;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.channel-actions {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 60px;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 
@@ -2989,6 +3116,140 @@ body {
   color: var(--text-secondary);
   min-width: 40px;
   text-align: right;
+}
+
+/* Model Quota Info in Card */
+.model-quota-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.quota-progress-mini {
+  width: 60px;
+  height: 4px;
+  background: var(--bg-secondary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.quota-progress-mini .quota-progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.quota-text-mini {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Model Quota Section in Stats */
+.model-quota-section {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.quota-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.quota-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.quota-values {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.quota-progress-bar {
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.quota-progress-bar .quota-progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--success-color),
+    var(--primary-color)
+  );
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.quota-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quota-percent {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.quota-remaining {
+  font-size: 0.65rem;
+  color: var(--success-color);
+}
+
+.quota-exceeded {
+  font-size: 0.65rem;
+  color: var(--danger-color);
+  font-weight: 500;
+}
+
+/* Model Budget Section */
+.model-budget-section {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.budget-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.budget-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.budget-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--success-color);
+}
+
+/* Usage Pricing */
+.usage-pricing {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.price-item {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
 }
 
 .token-provider-stats {

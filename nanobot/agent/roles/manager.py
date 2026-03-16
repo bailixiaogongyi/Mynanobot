@@ -14,6 +14,7 @@ class RoleManager:
     
     Roles are defined in YAML configuration file (config/roles.yaml).
     This is the single source of truth for all role definitions.
+    Supports dynamic reload without service restart.
     """
     
     def __init__(self, config_path: Path | None = None):
@@ -23,9 +24,77 @@ class RoleManager:
             config_path: Optional path to roles.yaml configuration file.
         """
         self.roles: dict[str, RoleDefinition] = {}
+        self._config_path = config_path
         
         if config_path:
             self._load_from_yaml(config_path)
+    
+    def reload(self) -> dict[str, Any]:
+        """Reload roles from YAML configuration file.
+        
+        Returns:
+            Dictionary with reload status and message.
+        """
+        if not self._config_path or not self._config_path.exists():
+            return {"success": False, "message": "Config file not found"}
+        
+        try:
+            old_roles = set(self.roles.keys())
+            self._load_from_yaml(self._config_path)
+            new_roles = set(self.roles.keys())
+            
+            added = new_roles - old_roles
+            removed = old_roles - new_roles
+            updated = old_roles & new_roles
+            
+            return {
+                "success": True,
+                "message": f"Reloaded successfully",
+                "roles_count": len(self.roles),
+                "added": list(added) if added else [],
+                "removed": list(removed) if removed else [],
+                "updated": list(updated) if updated else [],
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+    
+    def update_role(self, role_key: str, role_data: dict[str, Any]) -> dict[str, Any]:
+        """Update a role dynamically (runtime modification).
+        
+        Args:
+            role_key: The role identifier to update.
+            role_data: Dictionary containing role configuration.
+            
+        Returns:
+            Dictionary with update status.
+        """
+        try:
+            if role_key in self.roles:
+                role = RoleDefinition.from_dict(role_key, role_data)
+                self.roles[role_key] = role
+                return {"success": True, "message": f"Role '{role_key}' updated"}
+            else:
+                if role_data.get("enabled", True):
+                    role = RoleDefinition.from_dict(role_key, role_data)
+                    self.roles[role_key] = role
+                    return {"success": True, "message": f"Role '{role_key}' created"}
+                return {"success": False, "message": f"Role '{role_key}' not found and cannot be created (enabled=false)"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+    
+    def get_role_config(self, role_key: str) -> dict[str, Any] | None:
+        """Get full configuration for a role.
+        
+        Args:
+            role_key: The role identifier.
+            
+        Returns:
+            Dictionary with role configuration or None if not found.
+        """
+        role = self.roles.get(role_key)
+        if not role:
+            return None
+        return role.to_dict()
     
     def _load_from_yaml(self, config_path: Path) -> None:
         """Load roles from YAML configuration file.
@@ -69,8 +138,11 @@ class RoleManager:
         Returns:
             List of role information dictionaries.
         """
-        return [
-            {
+        result = []
+        for key, role in self.roles.items():
+            if not role.enabled:
+                continue
+            role_info = {
                 "key": key,
                 "name": role.name,
                 "description": role.description,
@@ -78,9 +150,13 @@ class RoleManager:
                 "enabled": role.enabled,
                 "has_custom_model": role.model_config is not None and role.model_config.model is not None,
             }
-            for key, role in self.roles.items()
-            if role.enabled
-        ]
+            if role.model_config:
+                role_info["model_config"] = {
+                    "provider": role.model_config.provider,
+                    "model": role.model_config.model,
+                }
+            result.append(role_info)
+        return result
     
     def match_role_for_task(self, task_description: str) -> str:
         """Match the most suitable role for a given task.

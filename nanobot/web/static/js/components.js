@@ -2578,6 +2578,11 @@ const ConfigPage = {
     },
   },
   mounted() {
+    console.log(
+      "[ConfigPage] Component mounted, activeSection:",
+      this.activeSection,
+    );
+    window.configPageInstance = this;
     this.loadConfig();
   },
   methods: {

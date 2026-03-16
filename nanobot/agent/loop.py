@@ -75,6 +75,7 @@ class AgentLoop:
         channels_config: ChannelsConfig | None = None,
         config: Any | None = None,
         upload_dir: Path | None = None,
+        image_generation_config: Any | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
@@ -93,6 +94,7 @@ class AgentLoop:
         self.restrict_to_workspace = restrict_to_workspace
         self.config = config
         self.upload_dir = upload_dir
+        self.image_generation_config = image_generation_config
 
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
@@ -243,6 +245,22 @@ class AgentLoop:
         
         from nanobot.agent.tools.cached_result import GetCachedResultTool
         self.tools.register(GetCachedResultTool(context_builder=self.context))
+        
+        if self.image_generation_config and self.image_generation_config.enabled:
+            from nanobot.agent.tools.image_gen import ImageGenerationTool
+            from nanobot.providers.image_provider import ImageGenerationProvider
+            
+            img_provider = ImageGenerationProvider(
+                api_key=self.image_generation_config.api_key or None,
+                api_base=self.image_generation_config.api_base or None,
+                model=self.image_generation_config.model or "wan21-turbo",
+            )
+            self.tools.register(ImageGenerationTool(
+                workspace=self.workspace,
+                allowed_dir=allowed_dir,
+                image_provider=img_provider,
+            ))
+            logger.info(f"Registered image generation tool with provider: {self.image_generation_config.provider}")
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""

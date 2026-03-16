@@ -499,6 +499,7 @@ def gateway(
         channels_config=config.channels,
         config=config,
         upload_dir=upload_dir,
+        image_generation_config=config.tools.image_generation,
     )
     
     # Set cron callback (needs agent)
@@ -717,6 +718,7 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         upload_dir=upload_dir,
+        image_generation_config=config.tools.image_generation,
     )
     
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -1210,6 +1212,7 @@ def cron_run(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         upload_dir=upload_dir,
+        image_generation_config=config.tools.image_generation,
     )
 
     store_path = get_data_dir() / "cron" / "jobs.json"

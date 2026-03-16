@@ -5,11 +5,17 @@ const API = {
   async getFingerprint() {
     if (this.fingerprint) return this.fingerprint;
     const FINGERPRINT_KEY = "nanobot_device_id";
-    let stored = localStorage.getItem(FINGERPRINT_KEY);
-    if (stored) {
-      this.fingerprint = stored;
-      return stored;
+    
+    try {
+      let stored = localStorage.getItem(FINGERPRINT_KEY);
+      if (stored) {
+        this.fingerprint = stored;
+        return stored;
+      }
+    } catch (e) {
+      console.warn("localStorage access blocked, using in-memory fingerprint");
     }
+    
     const components = [];
     components.push(navigator.userAgent);
     components.push(navigator.language);
@@ -40,7 +46,13 @@ const API = {
     this.fingerprint =
       Math.abs(hash).toString(16).padStart(8, "0") +
       Date.now().toString(16).slice(-8);
-    localStorage.setItem(FINGERPRINT_KEY, this.fingerprint);
+    
+    try {
+      localStorage.setItem(FINGERPRINT_KEY, this.fingerprint);
+    } catch (e) {
+      console.warn("localStorage write blocked, fingerprint stored in memory only");
+    }
+    
     return this.fingerprint;
   },
 

@@ -12,6 +12,7 @@ from typing import Any
 from loguru import logger
 
 from nanobot.utils.helpers import ensure_dir, get_data_path, safe_filename
+from nanobot.web.stats_storage import get_stats_storage
 
 MAX_CACHE_SIZE = 500
 DEFAULT_CACHE_TTL_HOURS = 24
@@ -360,3 +361,23 @@ class SessionManager:
         if model:
             session.used_model = model
         self.save(session)
+        
+        if model and (prompt_tokens + completion_tokens) > 0:
+            try:
+                stats_storage = get_stats_storage()
+                from nanobot.web.routes.stats import _get_model_pricing
+                model_info = _get_model_pricing(model)
+                provider = model_info.get("provider", "unknown")
+                input_price = model_info.get("input_price", 0)
+                output_price = model_info.get("output_price", 0)
+                estimated_cost = (prompt_tokens * input_price + completion_tokens * output_price) / 1_000_000
+                
+                stats_storage.update_model_stats(model, provider, {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "request_count": 1,
+                    "estimated_cost": estimated_cost,
+                    **model_info,
+                })
+            except Exception:
+                pass

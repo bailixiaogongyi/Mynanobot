@@ -34,11 +34,95 @@ class SpawnRequest(BaseModel):
     context_hint: str | None = None
 
 
+class RoleUpdateRequest(BaseModel):
+    """Request to update a role configuration."""
+    name: str | None = None
+    description: str | None = None
+    icon: str | None = None
+    config: dict[str, Any] | None = None
+    capabilities: dict[str, Any] | None = None
+    system_prompt: str | None = None
+    max_iterations: int | None = None
+    timeout: int | None = None
+    enabled: bool | None = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 @router.get("/roles")
 async def list_roles(request: Request) -> list[dict[str, Any]]:
     """List all available roles."""
     role_manager = request.app.state.role_manager
     return role_manager.list_roles()
+
+
+@router.get("/roles/{role_key}")
+async def get_role_config(role_key: str, request: Request) -> dict[str, Any]:
+    """Get full configuration for a specific role."""
+    role_manager = request.app.state.role_manager
+    config = role_manager.get_role_config(role_key)
+    if not config:
+        raise HTTPException(status_code=404, detail=f"Role '{role_key}' not found")
+    return config
+
+
+@router.post("/roles/reload")
+async def reload_roles(request: Request) -> dict[str, Any]:
+    """Reload all roles from configuration file."""
+    role_manager = request.app.state.role_manager
+    return role_manager.reload()
+
+
+@router.put("/roles/{role_key}")
+async def update_role(
+    role_key: str,
+    req: RoleUpdateRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Update a role configuration dynamically."""
+    role_manager = request.app.state.role_manager
+    
+    existing_config = role_manager.get_role_config(role_key)
+    if not existing_config:
+        raise HTTPException(status_code=404, detail=f"Role '{role_key}' not found")
+    
+    update_data = req.model_dump(exclude_unset=True)
+    if not update_data:
+        return {"success": False, "message": "No fields to update"}
+    
+    updated_config = {**existing_config, **update_data}
+    
+    return role_manager.update_role(role_key, updated_config)
+
+
+@router.get("/models")
+async def list_available_models(request: Request) -> list[dict[str, Any]]:
+    """List all available models from provider models."""
+    from nanobot.providers.provider_models import PROVIDER_MODELS
+    
+    models_by_provider: dict[str, list[dict[str, Any]]] = {}
+    
+    for spec in PROVIDER_MODELS:
+        if spec.provider not in models_by_provider:
+            models_by_provider[spec.provider] = []
+        
+        models_by_provider[spec.provider].append({
+            "model_id": spec.model_id,
+            "display_name": spec.display_name,
+            "supports_vision": spec.supports_vision,
+            "max_tokens": spec.max_tokens,
+            "description": spec.description,
+        })
+    
+    result = []
+    for provider, models in models_by_provider.items():
+        result.append({
+            "provider": provider,
+            "models": models,
+        })
+    
+    return result
 
 
 @router.get("/subagents")

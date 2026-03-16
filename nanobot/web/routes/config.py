@@ -141,6 +141,16 @@ class ChannelInfo(BaseModel):
     credentials_masked: dict[str, str] = {}
 
 
+class ImageGenerationConfigInfo(BaseModel):
+    """Image generation configuration info."""
+
+    enabled: bool = False
+    provider: str = "dashscope"
+    model: str = "wan21-turbo"
+    api_key: Optional[str] = ""
+    api_base: Optional[str] = ""
+
+
 class ConfigOverview(BaseModel):
     """Configuration overview."""
 
@@ -155,6 +165,7 @@ class ConfigOverview(BaseModel):
     gateway: GatewayConfigInfo
     tools_config: ToolsConfigInfo
     recent_models: list[dict[str, str]] = []
+    image_generation: ImageGenerationConfigInfo = ImageGenerationConfigInfo()
 
 
 class ModelUpdate(BaseModel):
@@ -199,6 +210,7 @@ class ToolConfigUpdate(BaseModel):
     """Tool configuration update request."""
 
     api_key: Optional[str] = None
+    max_results: Optional[int] = None
 
 
 def _mask_sensitive(value: str, show_chars: int = 4) -> str:
@@ -452,6 +464,7 @@ async def get_config(request: Request) -> ConfigOverview:
         tools={
             "web_search_api_key": bool(config.tools.web.search.api_key),
             "web_search_api_key_masked": _mask_sensitive(config.tools.web.search.api_key) if config.tools.web.search.api_key else "",
+            "web_search_max_results": config.tools.web.search.max_results,
             "weather_api_key": bool(config.tools.weather.weather.api_key),
             "weather_api_key_masked": _mask_sensitive(config.tools.weather.weather.api_key) if config.tools.weather.weather.api_key else "",
         },
@@ -469,6 +482,13 @@ async def get_config(request: Request) -> ConfigOverview:
             max_concurrent=config.agents.subagent.max_concurrent,
             default_timeout=config.agents.subagent.default_timeout,
             workspace_isolation=config.agents.subagent.workspace_isolation,
+        ),
+        image_generation=ImageGenerationConfigInfo(
+            enabled=config.tools.image_generation.enabled,
+            provider=config.tools.image_generation.provider,
+            model=config.tools.image_generation.model,
+            api_key="",  # Don't expose API key
+            api_base=config.tools.image_generation.api_base,
         ),
         upload=UploadConfigInfo(
             enabled=config.upload.enabled,
@@ -816,6 +836,8 @@ async def set_tool_config(
     if tool_name == "web_search":
         if update.api_key:
             config.tools.web.search.api_key = update.api_key
+        if update.max_results is not None:
+            config.tools.web.search.max_results = update.max_results
     elif tool_name == "weather":
         if update.api_key:
             config.tools.weather.weather.api_key = update.api_key
@@ -1005,6 +1027,44 @@ async def set_upload_config(
     return {
         "status": "updated",
         "message": "Upload configuration updated.",
+    }
+
+
+@router.post("/image_generation")
+async def set_image_generation_config(
+    update: ImageGenerationConfigInfo,
+    request: Request,
+) -> dict[str, Any]:
+    """Set image generation configuration.
+
+    Args:
+        update: Image generation update request.
+
+    Returns:
+        Update result.
+    """
+    config = _get_config(request)
+
+    if update.enabled is not None:
+        config.tools.image_generation.enabled = update.enabled
+    if update.provider is not None:
+        config.tools.image_generation.provider = update.provider
+    if update.model is not None:
+        config.tools.image_generation.model = update.model
+    if update.api_key is not None:
+        config.tools.image_generation.api_key = update.api_key
+    if update.api_base is not None:
+        config.tools.image_generation.api_base = update.api_base
+
+    from nanobot.config.loader import save_config, load_config, get_config_path
+    save_config(config)
+    
+    config_path = get_config_path()
+    request.app.state.config = load_config(config_path)
+
+    return {
+        "status": "updated",
+        "message": "Image generation configuration updated.",
     }
 
 
