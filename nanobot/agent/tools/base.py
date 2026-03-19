@@ -1,6 +1,7 @@
 """Base class for agent tools."""
 
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Any
 
 
@@ -15,7 +16,7 @@ class Tool(ABC):
     _TYPE_MAP = {
         "string": str,
         "integer": int,
-        "number": (int, float),
+        "number": (int, float, Decimal),
         "boolean": bool,
         "array": list,
         "object": dict,

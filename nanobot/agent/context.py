@@ -174,7 +174,12 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         return messages
 
     def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
-        """Build user message content with optional base64-encoded images and file hints."""
+        """Build user message content. 
+        
+        Note: Images are NOT sent directly to the main agent to avoid issues with
+        non-vision models. Instead, we provide hints about available image processing
+        options (OCR tools or spawn a vision-capable subagent).
+        """
         if not media:
             return text
         
@@ -186,32 +191,91 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             mime, _ = mimetypes.guess_type(path)
             
             if not p.is_file():
+                logger.warning(f"Media file not found: {path}")
                 continue
             
             if mime and mime.startswith("image/"):
-                b64 = base64.b64encode(p.read_bytes()).decode()
-                images.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                images.append((p.name, str(p), mime))
             else:
-                other_files.append((p.name, str(p)))
+                other_files.append((p.name, str(p), p.suffix.lower()))
         
-        if images:
-            content_parts = images + [{"type": "text", "text": text}]
-            if other_files:
-                file_hints = "\n\n[已上传文件，请使用相应工具处理：\n"
-                for name, fpath in other_files:
-                    file_hints += f"- {name} (路径: {fpath})\n"
-                file_hints += "]"
-                content_parts[-1]["text"] += file_hints
-            return content_parts
+        has_images = bool(images)
+        
+        if has_images:
+            image_info = "\n".join([f"- `{name}` (路径: `{path}`)" for name, path, _ in images])
+            
+            content_text = text + f"""
+
+## 📷 用户上传了图片
+
+图片列表：
+{image_info}
+
+### 处理方式选择：
+
+**方式一：OCR 文字识别（本地处理）**
+如果只需要识别图片中的文字，使用 `ocr_recognize` 工具：
+- 工具名: `ocr_recognize`
+- 参数: `path` (图片的完整路径，使用上面列表中的路径), `detail` (可选，是否返回详细信息)
+
+**方式二：调用图片识别子 Agent（推荐用于图片理解）**
+如果需要理解图片内容、场景、物体等，使用 `spawn` 工具创建一个专门处理图片的子 Agent：
+- 使用 vision-agent 角色（配置了支持视觉的模型）
+- 将图片路径传递给子 Agent
+- 子 Agent 会将图片转换为 base64 并分析
+
+### 执行建议：
+1. 如果用户要求"识别文字"、"OCR"，使用 `ocr_recognize`
+2. 如果用户要求"分析图片"、"描述图片"、"看图"，使用 `spawn` 调用 `vision-agent` 子 Agent
+3. 如果用户要求"生成图片"、"画图"、"创建图片"，使用 `spawn` 调用 `image-generator` 子 Agent
+4. 优先使用子 Agent 方式，因为子 Agent 配置了专门的模型
+"""
+        
+        else:
+            content_text = text
         
         if other_files:
-            file_hints = "\n\n[已上传文件，请使用相应工具处理：\n"
-            for name, fpath in other_files:
-                file_hints += f"- {name} (路径: {fpath})\n"
-            file_hints += "]"
-            return text + file_hints
+            file_hints = """
+
+## 已上传文件处理指南
+
+用户上传了以下非图片文件，请根据文件类型选择合适的工具处理：
+
+"""
+            for name, fpath, ext in other_files:
+                file_type_guide = self._get_file_type_guide(ext)
+                file_hints += f"- **文件**: `{name}`\n  - 路径: `{fpath}`\n  - 类型: {file_type_guide}\n"
+            
+            file_hints += """
+
+### 处理流程建议：
+1. 使用 `file_processing_guide` 工具获取文件处理指导
+2. 根据指导选择合适的工具（如 pdf_read_text, excel_read, docx_read_text 等）
+3. 处理完成后，向用户总结结果
+4. 如需返回处理后的文件，使用 `return_file` 工具
+"""
+            content_text += file_hints
         
-        return text
+        return content_text
+    
+    def _get_file_type_guide(self, ext: str) -> str:
+        """Get file type processing guide based on extension."""
+        guides = {
+            ".pdf": "PDF文档 - 可用工具: pdf_read_text, pdf_extract_tables, pdf_extract_images, ocr_pdf",
+            ".docx": "Word文档 - 可用工具: docx_read_text, docx_read_tables, docx_read_structure",
+            ".xlsx": "Excel表格 - 可用工具: excel_read, excel_write, excel_list_sheets",
+            ".pptx": "PPT演示文稿 - 可用工具: pptx_read",
+            ".txt": "文本文件 - 可用工具: read_file",
+            ".md": "Markdown文件 - 可用工具: read_file",
+            ".csv": "CSV数据文件 - 可用工具: excel_read",
+            ".jpg": "JPEG图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+            ".jpeg": "JPEG图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+            ".png": "PNG图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+            ".gif": "GIF图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+            ".bmp": "BMP图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+            ".webp": "WebP图片 - 可用工具: ocr_recognize (文字识别), image_understand (图片理解)",
+        }
+        return guides.get(ext, "未知类型文件 - 建议先尝试 read_file 读取内容")
     
     def add_tool_result(
         self,

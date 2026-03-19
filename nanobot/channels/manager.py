@@ -45,7 +45,9 @@ class ChannelManager:
                 )
                 logger.info("Telegram channel enabled")
             except ImportError as e:
-                logger.warning("Telegram channel not available: {}", e)
+                logger.error("Telegram channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Telegram channel initialization failed: {}", e)
         
         # WhatsApp channel
         if self.config.channels.whatsapp.enabled:
@@ -56,7 +58,9 @@ class ChannelManager:
                 )
                 logger.info("WhatsApp channel enabled")
             except ImportError as e:
-                logger.warning("WhatsApp channel not available: {}", e)
+                logger.error("WhatsApp channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("WhatsApp channel initialization failed: {}", e)
 
         # Discord channel
         if self.config.channels.discord.enabled:
@@ -67,7 +71,9 @@ class ChannelManager:
                 )
                 logger.info("Discord channel enabled")
             except ImportError as e:
-                logger.warning("Discord channel not available: {}", e)
+                logger.error("Discord channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Discord channel initialization failed: {}", e)
         
         # Feishu channel
         if self.config.channels.feishu.enabled:
@@ -78,7 +84,9 @@ class ChannelManager:
                 )
                 logger.info("Feishu channel enabled")
             except ImportError as e:
-                logger.warning("Feishu channel not available: {}", e)
+                logger.error("Feishu channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Feishu channel initialization failed: {}", e)
 
         # Mochat channel
         if self.config.channels.mochat.enabled:
@@ -90,7 +98,9 @@ class ChannelManager:
                 )
                 logger.info("Mochat channel enabled")
             except ImportError as e:
-                logger.warning("Mochat channel not available: {}", e)
+                logger.error("Mochat channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Mochat channel initialization failed: {}", e)
 
         # DingTalk channel
         if self.config.channels.dingtalk.enabled:
@@ -101,7 +111,9 @@ class ChannelManager:
                 )
                 logger.info("DingTalk channel enabled")
             except ImportError as e:
-                logger.warning("DingTalk channel not available: {}", e)
+                logger.error("DingTalk channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("DingTalk channel initialization failed: {}", e)
 
         # Email channel
         if self.config.channels.email.enabled:
@@ -112,7 +124,9 @@ class ChannelManager:
                 )
                 logger.info("Email channel enabled")
             except ImportError as e:
-                logger.warning("Email channel not available: {}", e)
+                logger.error("Email channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Email channel initialization failed: {}", e)
 
         # Slack channel
         if self.config.channels.slack.enabled:
@@ -123,7 +137,9 @@ class ChannelManager:
                 )
                 logger.info("Slack channel enabled")
             except ImportError as e:
-                logger.warning("Slack channel not available: {}", e)
+                logger.error("Slack channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("Slack channel initialization failed: {}", e)
 
         # QQ channel
         if self.config.channels.qq.enabled:
@@ -135,7 +151,9 @@ class ChannelManager:
                 )
                 logger.info("QQ channel enabled")
             except ImportError as e:
-                logger.warning("QQ channel not available: {}", e)
+                logger.error("QQ channel import failed: {}. Please install required dependencies.", e)
+            except Exception as e:
+                logger.error("QQ channel initialization failed: {}", e)
         
         # Web channel is always available when web UI is enabled
         if self.config.gateway.web_ui.enabled:

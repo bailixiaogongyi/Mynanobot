@@ -124,10 +124,22 @@ class SubagentManager:
         self.provider_factory = provider_factory
         self.default_temperature = temperature
         self.default_max_tokens = max_tokens
-        self.web_search_api_key = web_search_api_key
-        self.weather_api_key = weather_api_key
+        self._web_search_api_key = web_search_api_key
+        self._weather_api_key = weather_api_key
         self.exec_config = exec_config
         self.restrict_to_workspace = restrict_to_workspace
+
+    @property
+    def web_search_api_key(self) -> str:
+        if self.main_config and hasattr(self.main_config, 'tools'):
+            return getattr(self.main_config.tools.web.search, 'api_key', None) or self._web_search_api_key or ""
+        return self._web_search_api_key or ""
+
+    @property
+    def weather_api_key(self) -> str:
+        if self.main_config and hasattr(self.main_config, 'tools'):
+            return getattr(self.main_config.tools.weather.weather, 'api_key', None) or self._weather_api_key or ""
+        return self._weather_api_key or ""
         
         self._running_subagents: dict[str, asyncio.Task] = {}
         self._subagent_configs: dict[str, SubagentConfig] = {}
@@ -268,16 +280,37 @@ class SubagentManager:
             ))
         
         if capabilities.is_tool_allowed("web_search"):
-            tools.register(WebSearchTool(api_key=self.web_search_api_key))
+            tools.register(WebSearchTool(api_key_getter=lambda: self.web_search_api_key))
         
         if capabilities.is_tool_allowed("web_fetch"):
             tools.register(WebFetchTool())
         
         if capabilities.is_tool_allowed("weather"):
-            tools.register(WeatherTool(api_key=self.weather_api_key))
+            tools.register(WeatherTool(api_key_getter=lambda: self.weather_api_key))
         
         if capabilities.is_tool_allowed("weather_forecast"):
-            tools.register(WeatherForecastTool(api_key=self.weather_api_key))
+            tools.register(WeatherForecastTool(api_key_getter=lambda: self.weather_api_key))
+        
+        if capabilities.is_tool_allowed("understand_image"):
+            from nanobot.agent.tools.image_gen import ImageUnderstandingTool
+            tools.register(ImageUnderstandingTool(llm_provider=self.main_provider))
+        
+        if capabilities.is_tool_allowed("generate_image"):
+            if self.main_config and hasattr(self.main_config, 'tools') and hasattr(self.main_config.tools, 'image_generation'):
+                img_config = self.main_config.tools.image_generation
+                if img_config and img_config.enabled:
+                    from nanobot.agent.tools.image_gen import ImageGenerationTool
+                    from nanobot.providers.image_provider import ImageGenerationProvider
+                    img_provider = ImageGenerationProvider(
+                        api_key=img_config.api_key or None,
+                        api_base=img_config.api_base or None,
+                        model=img_config.model or "wan21-turbo",
+                    )
+                    tools.register(ImageGenerationTool(
+                        workspace=workspace,
+                        allowed_dir=allowed_dir,
+                        image_provider=img_provider,
+                    ))
         
         logger.debug(f"Built tools for role '{role.name}': {tools.tool_names}")
         return tools

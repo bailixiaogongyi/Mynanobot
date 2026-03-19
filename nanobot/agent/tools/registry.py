@@ -48,7 +48,7 @@ class ToolRegistry:
             if errors:
                 return f"Error: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
             result = await tool.execute(**params)
-            if isinstance(result, str) and result.startswith("Error"):
+            if isinstance(result, str) and result.startswith("Error:"):
                 return result + _HINT
             return result
         except Exception as e:

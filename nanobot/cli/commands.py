@@ -628,6 +628,7 @@ def gateway(
                 host=web_config.host,
                 port=web_config.port,
                 log_level="warning",
+                reload=True,
             )
             web_server = uvicorn.Server(config_uvicorn)
 

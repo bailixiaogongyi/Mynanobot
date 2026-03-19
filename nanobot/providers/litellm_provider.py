@@ -15,6 +15,7 @@ from nanobot.providers.registry import find_by_model, find_gateway
 
 # Standard OpenAI chat-completion message keys; extras (e.g. reasoning_content) are stripped for strict providers.
 _ALLOWED_MSG_KEYS = frozenset({"role", "content", "tool_calls", "tool_call_id", "name"})
+_ALLOWED_CONTENT_TYPES = frozenset({"text", "image_url", "image_url_detail"})
 
 
 class LiteLLMProvider(LLMProvider):
@@ -171,6 +172,23 @@ class LiteLLMProvider(LLMProvider):
         for msg in messages:
             clean = {k: v for k, v in msg.items() if k in _ALLOWED_MSG_KEYS}
             
+            if clean.get("role") == "user" and "content" in msg:
+                content = msg["content"]
+                if isinstance(content, list):
+                    valid_content = []
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") in _ALLOWED_CONTENT_TYPES:
+                            valid_content.append(item)
+                    if valid_content:
+                        clean["content"] = valid_content
+                    else:
+                        text_content = next((item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"), "")
+                        clean["content"] = text_content or ""
+                elif isinstance(content, str):
+                    pass
+                else:
+                    clean["content"] = str(content) if content else ""
+            
             if clean.get("role") == "assistant":
                 if "content" not in clean:
                     clean["content"] = None
@@ -301,6 +319,10 @@ class LiteLLMProvider(LLMProvider):
             "stream_options": {"include_usage": True},
         }
         
+        user_msg_after = next((m for m in kwargs['messages'] if m.get("role") == "user"), None)
+        if user_msg_after:
+            logger.info(f"[LiteLLM] User message after sanitize: {str(user_msg_after.get('content', ''))[:500]}...")
+        
         
         self._apply_model_overrides(model, kwargs)
         
@@ -410,6 +432,7 @@ class LiteLLMProvider(LLMProvider):
             )
                     
         except Exception as e:
+            logger.exception(f"[LiteLLM] Error in chat_stream: {str(e)}")
             yield StreamChunk(type="error", content=str(e))
     
     def _parse_response(self, response: Any) -> LLMResponse:

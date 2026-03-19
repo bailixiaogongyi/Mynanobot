@@ -83,6 +83,7 @@ class AgentDefaultsInfo(BaseModel):
     """Agent defaults configuration info."""
 
     model: str
+    provider: str = ""
     max_tokens: int
     temperature: float
     max_tool_iterations: int
@@ -172,6 +173,7 @@ class ModelUpdate(BaseModel):
     """Model update request."""
 
     model: str
+    provider: Optional[str] = None
     enable_reasoning: Optional[bool] = None
 
 
@@ -289,52 +291,6 @@ async def get_config(request: Request) -> ConfigOverview:
             except Exception as e:
                 logger.warning(f"Failed to get models for provider {spec.name}: {e}")
 
-        # Merge custom models
-        try:
-            from nanobot.config.custom_models import load_custom_models
-            custom_models = load_custom_models()
-            if spec.name in custom_models:
-                for model_id, custom_config in custom_models[spec.name].items():
-                    # Check if model already exists
-                    existing = next((m for m in model_infos if m.model_id == model_id), None)
-                    if existing:
-                        # Update existing model with custom config
-                        model_infos.remove(existing)
-                        model_infos.append(ProviderModelInfo(
-                            model_id=model_id,
-                            display_name=custom_config.get("display_name", existing.display_name),
-                            description=custom_config.get("description", existing.description),
-                            max_tokens=custom_config.get("max_tokens", existing.max_tokens),
-                            supports_vision=custom_config.get("supports_vision", existing.supports_vision),
-                            supports_function_calling=custom_config.get("supports_function_calling", existing.supports_function_calling),
-                            input_price=custom_config.get("input_price", existing.input_price),
-                            output_price=custom_config.get("output_price", existing.output_price),
-                            status=custom_config.get("status", existing.status),
-                            currency=custom_config.get("currency", "CNY"),
-                            token_quota=custom_config.get("token_quota", 0),
-                            token_used=custom_config.get("token_used", 0),
-                            is_custom=True,
-                        ))
-                    else:
-                        # Add new custom model
-                        model_infos.append(ProviderModelInfo(
-                            model_id=model_id,
-                            display_name=custom_config.get("display_name", model_id),
-                            description=custom_config.get("description", ""),
-                            max_tokens=custom_config.get("max_tokens", 4096),
-                            supports_vision=custom_config.get("supports_vision", False),
-                            supports_function_calling=custom_config.get("supports_function_calling", True),
-                            input_price=custom_config.get("input_price", 0.0),
-                            output_price=custom_config.get("output_price", 0.0),
-                            status=custom_config.get("status", "active"),
-                            currency=custom_config.get("currency", "CNY"),
-                            token_quota=custom_config.get("token_quota", 0),
-                            token_used=custom_config.get("token_used", 0),
-                            is_custom=True,
-                        ))
-        except Exception as e:
-            logger.warning(f"Failed to load custom models for provider {spec.name}: {e}")
-
         providers.append(ProviderInfo(
             name=spec.name,
             display_name=spec.display_name or spec.name.title(),
@@ -422,10 +378,10 @@ async def get_config(request: Request) -> ConfigOverview:
             display_name="Mochat",
             description="Mochat 渠道",
             enabled=config.channels.mochat.enabled,
-            has_credentials=bool(config.channels.mochat.claw_token),
+            has_credentials=bool(getattr(config.channels.mochat, 'clawToken', None) or getattr(config.channels.mochat, 'claw_token', "") or ""),
             credentials_masked={
-                "base_url": config.channels.mochat.base_url or "",
-                "claw_token": _mask_sensitive(config.channels.mochat.claw_token) if config.channels.mochat.claw_token else "",
+                "base_url": getattr(config.channels.mochat, 'baseUrl', None) or getattr(config.channels.mochat, 'base_url', "") or "",
+                "claw_token": _mask_sensitive(getattr(config.channels.mochat, 'clawToken', None) or getattr(config.channels.mochat, 'claw_token', "") or "") if (getattr(config.channels.mochat, 'clawToken', None) or getattr(config.channels.mochat, 'claw_token', "")) else "",
             },
         ),
         ChannelInfo(
@@ -462,14 +418,18 @@ async def get_config(request: Request) -> ConfigOverview:
         ),
         channels=channels,
         tools={
-            "web_search_api_key": bool(config.tools.web.search.api_key),
-            "web_search_api_key_masked": _mask_sensitive(config.tools.web.search.api_key) if config.tools.web.search.api_key else "",
-            "web_search_max_results": config.tools.web.search.max_results,
-            "weather_api_key": bool(config.tools.weather.weather.api_key),
-            "weather_api_key_masked": _mask_sensitive(config.tools.weather.weather.api_key) if config.tools.weather.weather.api_key else "",
+            "web_search": getattr(config.tools.web.search, 'enabled', True),
+            "web_search_api_key": getattr(config.tools.web.search, 'api_key', "") or "",
+            "web_search_api_key_masked": _mask_sensitive(getattr(config.tools.web.search, 'api_key', "") or "") if getattr(config.tools.web.search, 'api_key', "") else "",
+            "web_search_max_results": getattr(config.tools.web.search, 'max_results', 10) or 10,
+            "weather": getattr(config.tools.weather.weather, 'enabled', True),
+            "weather_api_key": getattr(config.tools.weather.weather, 'api_key', "") or "",
+            "weather_api_key_masked": _mask_sensitive(getattr(config.tools.weather.weather, 'api_key', "") or "") if getattr(config.tools.weather.weather, 'api_key', "") else "",
+            "mcp": config.tools.mcp_enabled if hasattr(config.tools, 'mcp_enabled') else False,
         },
         agent_defaults=AgentDefaultsInfo(
             model=config.agents.defaults.model,
+            provider=getattr(config.agents.defaults, 'provider', ''),
             max_tokens=config.agents.defaults.max_tokens,
             temperature=config.agents.defaults.temperature,
             max_tool_iterations=config.agents.defaults.max_tool_iterations,
@@ -508,8 +468,8 @@ async def get_config(request: Request) -> ConfigOverview:
             restrict_to_workspace=config.tools.restrict_to_workspace,
             exec_timeout=config.tools.exec.timeout,
             mcp_servers_count=len(config.tools.mcp_servers),
-            web_search_enabled=bool(config.tools.web.search.api_key),
-            weather_enabled=bool(config.tools.weather.weather.api_key),
+            web_search_enabled=bool(getattr(config.tools.web.search, 'apiKey', None) or getattr(config.tools.web.search, 'api_key', "") or ""),
+            weather_enabled=bool(getattr(config.tools.weather.weather, 'apiKey', None) or getattr(config.tools.weather.weather, 'api_key', "") or ""),
         ),
         recent_models=config.agents.recent_models[:5],
     )
@@ -530,12 +490,15 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
     config = _get_config(request)
 
     config.agents.defaults.model = update.model
+    if update.provider:
+        config.agents.defaults.provider = update.provider
     if update.enable_reasoning is not None:
         config.agents.defaults.enable_reasoning = update.enable_reasoning
 
     # Update recent_models
     current_model_info = {
         "model": update.model,
+        "provider": update.provider,
         "timestamp": datetime.now().isoformat(),
     }
     recent_models = config.agents.recent_models
@@ -555,6 +518,7 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
     return {
         "status": "updated",
         "model": update.model,
+        "provider": config.agents.defaults.provider,
         "enable_reasoning": config.agents.defaults.enable_reasoning,
         "message": "Model updated successfully.",
     }
@@ -793,8 +757,10 @@ async def set_channel_config(
             channel.smtp_password = update.smtp_password
     elif channel_name == "mochat":
         if update.base_url:
+            channel.baseUrl = update.base_url
             channel.base_url = update.base_url
         if update.claw_token:
+            channel.clawToken = update.claw_token
             channel.claw_token = update.claw_token
     elif channel_name == "qq":
         if update.app_id:
@@ -835,11 +801,14 @@ async def set_tool_config(
 
     if tool_name == "web_search":
         if update.api_key:
+            config.tools.web.search.apiKey = update.api_key
             config.tools.web.search.api_key = update.api_key
         if update.max_results is not None:
+            config.tools.web.search.maxResults = update.max_results
             config.tools.web.search.max_results = update.max_results
     elif tool_name == "weather":
         if update.api_key:
+            config.tools.weather.weather.apiKey = update.api_key
             config.tools.weather.weather.api_key = update.api_key
     else:
         raise HTTPException(status_code=404, detail=f"Tool not found: {tool_name}")
@@ -906,6 +875,12 @@ class ToolsConfigUpdate(BaseModel):
 
     restrict_to_workspace: Optional[bool] = None
     exec_timeout: Optional[int] = None
+    web_search_enabled: Optional[bool] = None
+    web_search_api_key: Optional[str] = None
+    web_search_max_results: Optional[int] = None
+    weather_enabled: Optional[bool] = None
+    weather_api_key: Optional[str] = None
+    mcp_enabled: Optional[bool] = None
 
 
 class KnowledgeUpdate(BaseModel):
@@ -1157,6 +1132,27 @@ async def set_tools_config(
         config.tools.restrict_to_workspace = update.restrict_to_workspace
     if update.exec_timeout is not None:
         config.tools.exec.timeout = update.exec_timeout
+
+    if update.web_search_enabled is not None:
+        if not hasattr(config.tools.web.search, 'enabled'):
+            config.tools.web.search.enabled = update.web_search_enabled
+        else:
+            config.tools.web.search.enabled = update.web_search_enabled
+    if update.web_search_api_key is not None:
+        config.tools.web.search.api_key = update.web_search_api_key
+    if update.web_search_max_results is not None:
+        config.tools.web.search.max_results = update.web_search_max_results
+
+    if update.weather_enabled is not None:
+        if not hasattr(config.tools.weather.weather, 'enabled'):
+            config.tools.weather.weather.enabled = update.weather_enabled
+        else:
+            config.tools.weather.weather.enabled = update.weather_enabled
+    if update.weather_api_key is not None:
+        config.tools.weather.weather.api_key = update.weather_api_key
+
+    if update.mcp_enabled is not None:
+        config.tools.mcp_enabled = update.mcp_enabled
 
     from nanobot.config.loader import save_config, load_config, get_config_path
     save_config(config)
@@ -1557,34 +1553,39 @@ async def save_custom_model(
     }
 
 
-@router.delete("/provider/{provider_name}/models/custom/{model_id}")
+@router.delete("/provider/{provider_name}/models/custom")
 async def delete_custom_model(
     provider_name: str,
     model_id: str,
     request: Request,
 ) -> dict[str, Any]:
-    """Delete a custom model configuration.
-    
+    """Delete a model configuration (custom or predefined).
+
     Args:
         provider_name: Provider name.
-        model_id: Model identifier.
-        
+        model_id: Model identifier (passed as query parameter since it may contain /).
+
     Returns:
         Delete result.
     """
-    from nanobot.config.custom_models import delete_custom_model as delete_model
-    
-    deleted = delete_model(provider_name, model_id)
-    
-    if deleted:
-        return {
-            "status": "deleted",
-            "provider": provider_name,
-            "model_id": model_id,
-            "message": "Custom model deleted successfully.",
-        }
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Custom model not found: {provider_name}/{model_id}",
-        )
+    from nanobot.config.custom_models import delete_custom_model as delete_model, load_custom_models
+
+    custom_models = load_custom_models()
+    provider_models = custom_models.get(provider_name, {})
+
+    if model_id in provider_models:
+        deleted = delete_model(provider_name, model_id)
+        if deleted:
+            return {
+                "status": "deleted",
+                "provider": provider_name,
+                "model_id": model_id,
+                "message": "Custom model deleted successfully.",
+            }
+
+    return {
+        "status": "deleted",
+        "provider": provider_name,
+        "model_id": model_id,
+        "message": "Model reference removed (predefined model).",
+    }

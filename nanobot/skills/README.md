@@ -33,3 +33,4 @@ The skill format and metadata structure follow OpenClaw's conventions to maintai
 | `temp-note`          | 临时笔记                                             |
 | `archive`            | 归档管理                                             |
 | `word-operations`    | Word文档操作，读取内容、调整样式、表格操作、模板生成 |
+| `vision-operations`  | 图片内容识别和文生图操作，支持图片分析和AI生成图片   |

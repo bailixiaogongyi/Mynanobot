@@ -21,7 +21,24 @@ def _get_model_pricing(model_name: str) -> dict[str, Any]:
     Returns:
         Dict with provider, input_price, output_price, max_tokens, display_name, etc.
     """
-    from nanobot.providers.provider_models import get_model_by_id, _load_custom_models, PROVIDER_MODELS
+    try:
+        from nanobot.providers.provider_models import get_model_by_id, _load_custom_models, PROVIDER_MODELS
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to import provider_models: {e}")
+        return {
+            "provider": "unknown",
+            "input_price": 0.0,
+            "output_price": 0.0,
+            "max_tokens": 0,
+            "display_name": model_name,
+            "supports_vision": False,
+            "supports_function_calling": True,
+            "status": "unknown",
+            "currency": "CNY",
+            "token_quota": 0,
+            "token_used": 0,
+        }
 
     if "/" in model_name:
         provider, model_id = model_name.split("/", 1)
@@ -29,7 +46,13 @@ def _get_model_pricing(model_name: str) -> dict[str, Any]:
         provider = "unknown"
         model_id = model_name
 
-    spec = get_model_by_id(provider, model_id)
+    try:
+        spec = get_model_by_id(provider, model_id)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Error getting model by id {provider}/{model_id}: {e}")
+        spec = None
+        
     if spec:
         return {
             "provider": provider,
@@ -40,44 +63,47 @@ def _get_model_pricing(model_name: str) -> dict[str, Any]:
             "supports_vision": spec.supports_vision,
             "supports_function_calling": spec.supports_function_calling,
             "status": spec.status,
-            "currency": spec.currency if hasattr(spec, 'currency') else "USD",
+            "currency": spec.currency if hasattr(spec, 'currency') else "CNY",
             "token_quota": spec.token_quota if hasattr(spec, 'token_quota') else 0,
             "token_used": spec.token_used if hasattr(spec, 'token_used') else 0,
         }
 
     custom_models = _load_custom_models()
-    for provider_key, models in custom_models.items():
-        for model_id_key, model_spec in models.items():
-            if model_spec.get("model_id") == model_id:
-                return {
-                    "provider": model_spec.get("provider", provider_key),
-                    "input_price": model_spec.get("input_price", 0.0),
-                    "output_price": model_spec.get("output_price", 0.0),
-                    "max_tokens": model_spec.get("max_tokens", 0),
-                    "display_name": model_spec.get("display_name", model_id),
-                    "supports_vision": model_spec.get("supports_vision", False),
-                    "supports_function_calling": model_spec.get("supports_function_calling", True),
-                    "status": model_spec.get("status", "unknown"),
-                    "currency": model_spec.get("currency", "USD"),
-                    "token_quota": model_spec.get("token_quota", 0),
-                    "token_used": model_spec.get("token_used", 0),
-                }
-
-    for m in PROVIDER_MODELS:
-        if m.model_id == model_id:
+    for model_spec in custom_models:
+        if model_spec.model_id == model_id:
             return {
-                "provider": m.provider,
-                "input_price": m.input_price,
-                "output_price": m.output_price,
-                "max_tokens": m.max_tokens,
-                "display_name": m.display_name,
-                "supports_vision": m.supports_vision,
-                "supports_function_calling": m.supports_function_calling,
-                "status": m.status,
-                "currency": m.currency if hasattr(m, 'currency') else "USD",
-                "token_quota": m.token_quota if hasattr(m, 'token_quota') else 0,
-                "token_used": m.token_used if hasattr(m, 'token_used') else 0,
+                "provider": model_spec.provider,
+                "input_price": model_spec.input_price,
+                "output_price": model_spec.output_price,
+                "max_tokens": model_spec.max_tokens,
+                "display_name": model_spec.display_name,
+                "supports_vision": model_spec.supports_vision,
+                "supports_function_calling": model_spec.supports_function_calling,
+                "status": model_spec.status,
+                "currency": model_spec.currency if hasattr(model_spec, 'currency') else "CNY",
+                "token_quota": model_spec.token_quota if hasattr(model_spec, 'token_quota') else 0,
+                "token_used": model_spec.token_used if hasattr(model_spec, 'token_used') else 0,
             }
+
+    try:
+        for m in PROVIDER_MODELS:
+            if m.model_id == model_id:
+                return {
+                    "provider": m.provider,
+                    "input_price": m.input_price,
+                    "output_price": m.output_price,
+                    "max_tokens": m.max_tokens,
+                    "display_name": m.display_name,
+                    "supports_vision": m.supports_vision,
+                    "supports_function_calling": m.supports_function_calling,
+                    "status": m.status,
+                    "currency": m.currency if hasattr(m, 'currency') else "CNY",
+                    "token_quota": m.token_quota if hasattr(m, 'token_quota') else 0,
+                    "token_used": m.token_used if hasattr(m, 'token_used') else 0,
+                }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Error iterating PROVIDER_MODELS: {e}")
 
     return {
         "provider": provider,
@@ -88,7 +114,7 @@ def _get_model_pricing(model_name: str) -> dict[str, Any]:
         "supports_vision": False,
         "supports_function_calling": True,
         "status": "unknown",
-        "currency": "USD",
+        "currency": "CNY",
         "token_quota": 0,
         "token_used": 0,
     }
@@ -164,6 +190,8 @@ async def get_token_stats(
             "total_tokens": total_tokens,
             "total_requests": total_requests,
             "active_sessions": session_count,
+            "estimated_cost": sum(m.get("estimated_cost", 0) for m in by_model.values()),
+            "currency": "CNY",
             "by_model": list(by_model.values()),
             "by_provider": list(by_provider.values()),
             "period": period,
@@ -247,7 +275,7 @@ async def get_token_stats(
                 "supports_vision": model_info["supports_vision"],
                 "supports_function_calling": model_info["supports_function_calling"],
                 "status": model_info["status"],
-                "currency": model_info.get("currency", "USD"),
+                "currency": model_info.get("currency", "CNY"),
                 "token_quota": model_info.get("token_quota", 0),
                 "token_used": model_info.get("token_used", 0),
             }

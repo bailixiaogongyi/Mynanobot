@@ -520,14 +520,34 @@ def get_models_by_provider(provider: str) -> list[ProviderModelSpec]:
     Returns:
         List of ProviderModelSpec for the provider
     """
+    from nanobot.config.custom_models import load_custom_models
+
+    custom_models_data = load_custom_models()
+
+    if provider in custom_models_data and custom_models_data[provider]:
+        custom_specs = []
+        for model_id, model_config in custom_models_data[provider].items():
+            custom_specs.append(ProviderModelSpec(
+                provider=provider,
+                model_id=model_id,
+                display_name=model_config.get("display_name", model_id),
+                description=model_config.get("description", ""),
+                max_tokens=model_config.get("max_tokens", 4096),
+                supports_vision=model_config.get("supports_vision", False),
+                supports_function_calling=model_config.get("supports_function_calling", True),
+                supports_streaming=model_config.get("supports_streaming", True),
+                input_price=model_config.get("input_price", 0.0),
+                output_price=model_config.get("output_price", 0.0),
+                currency=model_config.get("currency", "CNY"),
+                token_quota=model_config.get("token_quota", 0),
+                token_used=model_config.get("token_used", 0),
+                status=model_config.get("status", "active"),
+                is_custom=model_config.get("is_custom", False),
+            ))
+        return custom_specs
+
     builtin = [m for m in PROVIDER_MODELS if m.provider == provider]
-    custom = [m for m in _load_custom_models() if m.provider == provider]
-    
-    custom_ids = {m.model_id for m in custom}
-    result = [m for m in builtin if m.model_id not in custom_ids]
-    result.extend(custom)
-    
-    return result
+    return builtin
 
 
 def get_model_by_id(provider: str, model_id: str) -> ProviderModelSpec | None:

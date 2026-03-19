@@ -34,12 +34,22 @@ class SpawnRequest(BaseModel):
     context_hint: str | None = None
 
 
+class ModelConfigRequest(BaseModel):
+    """Request for role model configuration."""
+    provider: str | None = None
+    model: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    api_key: str | None = None
+    api_base: str | None = None
+
+
 class RoleUpdateRequest(BaseModel):
     """Request to update a role configuration."""
     name: str | None = None
     description: str | None = None
     icon: str | None = None
-    config: dict[str, Any] | None = None
+    model_settings: ModelConfigRequest | None = None
     capabilities: dict[str, Any] | None = None
     system_prompt: str | None = None
     max_iterations: int | None = None
@@ -91,6 +101,13 @@ async def update_role(
     if not update_data:
         return {"success": False, "message": "No fields to update"}
     
+    if "model_settings" in update_data and update_data["model_settings"] is not None:
+        update_data["model_config"] = {
+            k: v for k, v in update_data["model_settings"].items()
+            if v is not None
+        }
+        del update_data["model_settings"]
+    
     updated_config = {**existing_config, **update_data}
     
     return role_manager.update_role(role_key, updated_config)
@@ -128,14 +145,18 @@ async def list_available_models(request: Request) -> list[dict[str, Any]]:
 @router.get("/subagents")
 async def list_subagents(request: Request) -> list[dict[str, Any]]:
     """List all active subagents."""
-    subagent_manager = request.app.state.subagent_manager
+    subagent_manager = getattr(request.app.state, 'subagent_manager', None)
+    if subagent_manager is None:
+        return []
     return subagent_manager.list_active()
 
 
 @router.get("/subagents/{task_id}")
 async def get_subagent_status(task_id: str, request: Request) -> dict[str, Any]:
     """Get status of a specific subagent."""
-    subagent_manager = request.app.state.subagent_manager
+    subagent_manager = getattr(request.app.state, 'subagent_manager', None)
+    if subagent_manager is None:
+        raise HTTPException(status_code=404, detail="Subagent manager not available")
     status = subagent_manager.get_status(task_id)
     if not status:
         raise HTTPException(status_code=404, detail=f"Subagent {task_id} not found")
@@ -149,7 +170,9 @@ async def subagent_action(
     request: Request,
 ) -> dict[str, Any]:
     """Perform action on a subagent (pause/resume/cancel)."""
-    subagent_manager = request.app.state.subagent_manager
+    subagent_manager = getattr(request.app.state, 'subagent_manager', None)
+    if subagent_manager is None:
+        raise HTTPException(status_code=404, detail="Subagent manager not available")
     
     if req.action == "pause":
         success = await subagent_manager.pause(task_id)
@@ -176,7 +199,7 @@ async def get_subagent_logs(
     since_index: int = 0,
 ) -> dict[str, Any]:
     """Get logs for a subagent."""
-    subagent_manager = request.app.state.subagent_manager
+    subagent_manager = getattr(request.app.state, 'subagent_manager', None)
     
     if not subagent_manager:
         raise HTTPException(status_code=500, detail="Subagent manager not available")
@@ -241,9 +264,16 @@ async def spawn_subagent(
     from nanobot.agent.tasks.models import TaskPriority, TaskContext
     from nanobot.agent.context.packer import ContextPacker
     
-    subagent_manager = request.app.state.subagent_manager
-    task_manager = request.app.state.task_manager
-    role_manager = request.app.state.role_manager
+    subagent_manager = getattr(request.app.state, 'subagent_manager', None)
+    task_manager = getattr(request.app.state, 'task_manager', None)
+    role_manager = getattr(request.app.state, 'role_manager', None)
+    
+    if not subagent_manager:
+        raise HTTPException(status_code=500, detail="Subagent manager not available")
+    if not task_manager:
+        raise HTTPException(status_code=500, detail="Task manager not available")
+    if not role_manager:
+        raise HTTPException(status_code=500, detail="Role manager not available")
     
     role = req.role
     if not role:

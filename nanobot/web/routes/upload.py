@@ -25,6 +25,8 @@ class UploadResponse(BaseModel):
     mime_type: str
     size: int
     path: str
+    name: str
+    local_path: str | None = None
 
 
 class FileInfo(BaseModel):
@@ -70,6 +72,31 @@ def _get_upload_dir(request: Request) -> Path:
         upload_dir = temp_dir
     
     return upload_dir
+
+
+def _get_generated_images_dir(request: Request) -> Path:
+    """Get generated images directory path."""
+    import tempfile
+    
+    config = request.app.state.config
+    workspace = Path(config.agents.defaults.workspace).expanduser()
+    generated_dir = workspace / "generated_images"
+    
+    try:
+        generated_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        temp_dir = Path(tempfile.gettempdir()) / "nanobot_generated"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        logger.warning(f"No permission to create {generated_dir}, using temp dir: {temp_dir}")
+        generated_dir = temp_dir
+    
+    return generated_dir
+
+
+def _get_file_url(request: Request, filename: str) -> str:
+    """Get full URL for uploaded file."""
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}/api/upload/files/{filename}"
 
 
 def _get_file_type(ext: str) -> str:
@@ -129,6 +156,8 @@ async def upload_file(
     
     logger.info(f"Uploaded file: {new_filename} ({len(content)} bytes)")
     
+    file_url = _get_file_url(request, new_filename)
+    
     return UploadResponse(
         file_id=file_id,
         filename=new_filename,
@@ -136,7 +165,9 @@ async def upload_file(
         file_type=_get_file_type(ext),
         mime_type=mime_type,
         size=len(content),
-        path=str(file_path),
+        path=file_url,
+        name=file.filename or "file",
+        local_path=str(file_path),
     )
 
 
@@ -247,3 +278,26 @@ async def delete_file(
     logger.info(f"Deleted file: {filename}")
     
     return {"status": "deleted", "filename": filename}
+
+
+@router.get("/generated/{filename}")
+async def get_generated_image(
+    filename: str,
+    request: Request,
+) -> FileResponse:
+    """Download or preview a generated image."""
+    generated_dir = _get_generated_images_dir(request)
+    file_path = generated_dir / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    try:
+        file_path.resolve().relative_to(generated_dir.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="非法路径")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+    )

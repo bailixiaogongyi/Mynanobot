@@ -38,12 +38,15 @@ class WeatherTool(Tool):
         "required": ["location"]
     }
     
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, api_key_getter=None):
         self._init_api_key = api_key
+        self._api_key_getter = api_key_getter
 
     @property
     def api_key(self) -> str:
         """Resolve API key at call time so env/config changes are picked up."""
+        if self._api_key_getter:
+            return self._api_key_getter() or ""
         return self._init_api_key or os.environ.get("SENIVERSE_API_KEY", "")
 
     async def execute(
@@ -158,11 +161,14 @@ class WeatherForecastTool(Tool):
         "required": ["location"]
     }
     
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, api_key_getter=None):
         self._init_api_key = api_key
+        self._api_key_getter = api_key_getter
 
     @property
     def api_key(self) -> str:
+        if self._api_key_getter:
+            return self._api_key_getter() or ""
         return self._init_api_key or os.environ.get("SENIVERSE_API_KEY", "")
 
     async def execute(

@@ -78,7 +78,7 @@ class StatsStorage:
                 "supports_vision": stats.get("supports_vision", False),
                 "supports_function_calling": stats.get("supports_function_calling", True),
                 "status": stats.get("status", "unknown"),
-                "currency": stats.get("currency", "USD"),
+                "currency": stats.get("currency", "CNY"),
                 "token_quota": stats.get("token_quota", 0),
                 "token_used": stats.get("token_used", 0),
             }

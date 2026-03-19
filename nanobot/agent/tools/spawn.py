@@ -80,6 +80,7 @@ class SpawnTool(Tool):
 - code_developer: 代码开发专家 💻  
 - data_analyst: 数据分析专家 📊
 - researcher: 研究分析专家 🔍
+- image_processor: 图像处理专家 🖼️
 
 如果不指定角色，系统会根据任务内容自动匹配最合适的角色。
 
@@ -96,8 +97,8 @@ class SpawnTool(Tool):
                 },
                 "role": {
                     "type": "string",
-                    "description": "角色名称，可选值: document_writer, code_developer, data_analyst, researcher",
-                    "enum": ["document_writer", "code_developer", "data_analyst", "researcher"],
+                    "description": "角色名称，可选值: document_writer, code_developer, data_analyst, researcher, image_processor",
+                    "enum": ["document_writer", "code_developer", "data_analyst", "researcher", "image_processor"],
                 },
                 "title": {
                     "type": "string",

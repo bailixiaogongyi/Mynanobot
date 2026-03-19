@@ -14,11 +14,9 @@ from nanobot.agent.tools.base import Tool
 class ImageGenerationTool(Tool):
     """Tool to generate images from text descriptions using AI.
     
-    Supports multiple image generation backends:
-    - OpenAI DALL-E
-    - 阿里云通义万相 (WanXiang)
-    - 百度千帆 (ERNIE)
-    - Custom endpoints
+    Supports SiliconFlow API:
+    - Kwai-Kolors/Kolors (快手可图)
+    - Qwen/Qwen-Image (通义万相)
     """
     
     def __init__(
@@ -26,10 +24,12 @@ class ImageGenerationTool(Tool):
         workspace: Path | None = None,
         allowed_dir: Path | None = None,
         image_provider=None,
+        upload_dir: Path | None = None,
     ):
         self._workspace = workspace
         self._allowed_dir = allowed_dir
         self._image_provider = image_provider
+        self._upload_dir = upload_dir
     
     @property
     def name(self) -> str:
@@ -59,7 +59,7 @@ class ImageGenerationTool(Tool):
                 },
                 "quality": {
                     "type": "string",
-                    "description": "Image quality - 'standard' or 'hd' (only for DALL-E 3)",
+                    "description": "Image quality - 'standard' or 'hd'",
                     "default": "standard"
                 },
                 "n": {
@@ -104,8 +104,12 @@ class ImageGenerationTool(Tool):
             save_path: Optional custom save path.
             
         Returns:
-            Result message with image paths.
+            Result message with image paths, or special format for display in chat.
         """
+        import json
+        import shutil
+        from datetime import datetime
+        
         if not self._image_provider:
             return "Error: Image generation provider not configured. Please configure image generation in settings."
         
@@ -152,15 +156,39 @@ class ImageGenerationTool(Tool):
             if not saved_paths:
                 return f"Error: No images were generated. Please try again with a different prompt."
             
-            if len(saved_paths) == 1:
-                return f"Image generated successfully!\n\nImage saved to: {saved_paths[0]}\n\nPrompt: {prompt}"
-            else:
-                paths_str = "\n".join([f"- {p}" for p in saved_paths])
-                return f"Generated {len(saved_paths)} images successfully!\n\nImages saved to:\n{paths_str}\n\nPrompt: {prompt}"
+            image_infos = []
+            for path in saved_paths:
+                image_infos.append({
+                    "path": path,
+                    "original_name": Path(path).name,
+                })
+            
+            return f"IMAGE_GENERATED:{json.dumps(image_infos, ensure_ascii=False)}"
                 
         except Exception as e:
             logger.exception("Image generation failed")
             return f"Error generating image: {str(e)}"
+    
+    def _save_to_upload_dir(self, source_path: Path) -> str | None:
+        """Save a copy of the image to upload directory for display in chat."""
+        if not self._upload_dir:
+            return None
+        
+        try:
+            self._upload_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_id = uuid.uuid4().hex[:12]
+            dest_name = f"{timestamp}_{file_id}_{source_path.name}"
+            dest_path = self._upload_dir / dest_name
+            
+            shutil.copy2(source_path, dest_path)
+            logger.info(f"Copied generated image to upload dir: {dest_path}")
+            
+            return str(dest_path)
+        except Exception as e:
+            logger.warning(f"Failed to copy image to upload dir: {e}")
+            return None
 
 
 class ImageUnderstandingTool(Tool):

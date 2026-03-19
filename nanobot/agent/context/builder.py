@@ -156,6 +156,7 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
         media: list[str] | None = None,
         channel: str | None = None,
         chat_id: str | None = None,
+        convert_to_base64: bool = True,
     ) -> list[dict[str, Any]]:
         messages = []
 
@@ -164,7 +165,7 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
 
         messages.extend(history)
 
-        user_content = self._build_user_content(current_message, media)
+        user_content = self._build_user_content(current_message, media, convert_to_base64)
         # Note: Runtime Context is intentionally NOT injected into user message
         # to maintain System Prompt cache stability (per Claude Code best practices)
         # The time/channel info can be accessed via tool calls if needed
@@ -172,8 +173,15 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
 
         return messages
 
-    def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
-        """Build user message content with optional base64-encoded images and file hints."""
+    def _build_user_content(self, text: str, media: list[str] | None, convert_to_base64: bool = True) -> str | list[dict[str, Any]]:
+        """Build user message content with optional base64-encoded images and file hints.
+        
+        Args:
+            text: The user message text.
+            media: List of media file paths.
+            convert_to_base64: If True, convert images to base64 for VLM models.
+                              If False, only send text hints (for non-VLM main agent).
+        """
         if not media:
             return text
         
@@ -188,16 +196,45 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
                 continue
             
             if mime and mime.startswith("image/"):
-                b64 = base64.b64encode(p.read_bytes()).decode()
-                images.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                if convert_to_base64:
+                    b64 = base64.b64encode(p.read_bytes()).decode()
+                    images.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                else:
+                    other_files.append((p.name, str(p), "image"))
             else:
-                other_files.append((p.name, str(p)))
+                other_files.append((p.name, str(p), "file"))
         
         if images:
             content_parts = images + [{"type": "text", "text": text}]
             if other_files:
                 file_hints = "\n\n[已上传文件，请使用相应工具读取：\n"
-                for name, fpath in other_files:
+                for name, fpath, ftype in other_files:
+                    if ftype == "image":
+                        file_hints += f"- {name} (路径: {fpath}) → 使用 ocr_recognize 工具识别文字，或使用 understand_image 工具理解图片内容\n"
+                    else:
+                        ext = Path(name).suffix.lower()
+                        if ext == ".doc":
+                            file_hints += f"- {name} (路径: {fpath}) → 使用 doc_read 工具读取\n"
+                        elif ext == ".docx":
+                            file_hints += f"- {name} (路径: {fpath}) → 使用 docx_read_text 或 docx_read_structure 工具读取\n"
+                        elif ext in (".xls", ".xlsx"):
+                            file_hints += f"- {name} (路径: {fpath}) → 使用 excel_read 工具读取\n"
+                        elif ext == ".pdf":
+                            file_hints += f"- {name} (路径: {fpath}) → 使用 pdf_read_text 工具读取\n"
+                        elif ext == ".pptx":
+                            file_hints += f"- {name} (路径: {fpath}) → 使用 pptx_read 工具读取\n"
+                        else:
+                            file_hints += f"- {name} (路径: {fpath})\n"
+                file_hints += "]"
+                content_parts[-1]["text"] += file_hints
+            return content_parts
+        
+        if other_files:
+            file_hints = "\n\n[已上传文件，请使用相应工具读取：\n"
+            for name, fpath, ftype in other_files:
+                if ftype == "image":
+                    file_hints += f"- {name} (路径: {fpath}) → 使用 ocr_recognize 工具识别文字，或使用 understand_image 工具理解图片内容\n"
+                else:
                     ext = Path(name).suffix.lower()
                     if ext == ".doc":
                         file_hints += f"- {name} (路径: {fpath}) → 使用 doc_read 工具读取\n"
@@ -211,26 +248,6 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
                         file_hints += f"- {name} (路径: {fpath}) → 使用 pptx_read 工具读取\n"
                     else:
                         file_hints += f"- {name} (路径: {fpath})\n"
-                file_hints += "]"
-                content_parts[-1]["text"] += file_hints
-            return content_parts
-        
-        if other_files:
-            file_hints = "\n\n[已上传文件，请使用相应工具读取：\n"
-            for name, fpath in other_files:
-                ext = Path(name).suffix.lower()
-                if ext == ".doc":
-                    file_hints += f"- {name} (路径: {fpath}) → 使用 doc_read 工具读取\n"
-                elif ext == ".docx":
-                    file_hints += f"- {name} (路径: {fpath}) → 使用 docx_read_text 或 docx_read_structure 工具读取\n"
-                elif ext in (".xls", ".xlsx"):
-                    file_hints += f"- {name} (路径: {fpath}) → 使用 excel_read 工具读取\n"
-                elif ext == ".pdf":
-                    file_hints += f"- {name} (路径: {fpath}) → 使用 pdf_read_text 工具读取\n"
-                elif ext == ".pptx":
-                    file_hints += f"- {name} (路径: {fpath}) → 使用 pptx_read 工具读取\n"
-                else:
-                    file_hints += f"- {name} (路径: {fpath})\n"
             file_hints += "]"
             return text + file_hints
         

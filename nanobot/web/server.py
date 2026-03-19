@@ -229,9 +229,13 @@ def create_app(
                 return Response(content=f.read(), media_type="text/html")
         return Response(content="Login page not found", status_code=404)
 
-    static_dir = Path(__file__).parent / "static"
+    static_dir = Path(__file__).parent / "dist"
     if static_dir.exists() and (static_dir / "index.html").exists():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    else:
+        static_dir = Path(__file__).parent / "static"
+        if static_dir.exists() and (static_dir / "index.html").exists():
+            app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     return app
 

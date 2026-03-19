@@ -79,16 +79,16 @@ class AgentLoop:
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
-        self.channels_config = channels_config
+        self._channels_config = channels_config
         self.provider = provider
         self.workspace = workspace
         self._model = model or provider.get_default_model()
-        self.max_iterations = max_iterations
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.memory_window = memory_window
-        self.web_search_api_key = web_search_api_key
-        self.weather_api_key = weather_api_key
+        self._temperature = temperature
+        self._max_tokens = max_tokens
+        self._max_iterations = max_iterations
+        self._memory_window = memory_window
+        self._web_search_api_key = web_search_api_key
+        self._weather_api_key = weather_api_key
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
@@ -119,7 +119,9 @@ class AgentLoop:
 
     @property
     def model(self) -> str:
-        """Get the current model."""
+        """Get the current model, dynamically from config if available."""
+        if self.config and hasattr(self.config.agents.defaults, 'model'):
+            return self.config.agents.defaults.model
         return self._model
 
     @model.setter
@@ -151,16 +153,18 @@ class AgentLoop:
         from nanobot import config as nanobot_config
         
         role_manager = RoleManager()
-        
-        default_roles_path = Path(nanobot_config.__file__).parent / "roles.yaml"
-        if default_roles_path.exists():
-            role_manager._load_from_yaml(default_roles_path)
-            logger.debug(f"Loaded default roles from {default_roles_path}")
-        
+
         user_roles_path = workspace / "config" / "roles.yaml"
         if user_roles_path.exists():
+            role_manager._config_path = user_roles_path
             role_manager._load_from_yaml(user_roles_path)
             logger.debug(f"Loaded user roles from {user_roles_path}")
+        else:
+            default_roles_path = Path(nanobot_config.__file__).parent / "roles.yaml"
+            if default_roles_path.exists():
+                role_manager._config_path = default_roles_path
+                role_manager._load_from_yaml(default_roles_path)
+                logger.debug(f"Loaded default roles from {default_roles_path}")
         
         task_manager = TaskManager(workspace, bus)
         provider_factory = ProviderFactory(config) if config else None
@@ -193,10 +197,11 @@ class AgentLoop:
         from nanobot.agent.tools.legacy_docs import DocReadTool, DocToDocxTool
         from nanobot.agent.tools.excel import ExcelReadTool, ExcelWriteTool
         from nanobot.agent.tools.pdf import PdfReadTextTool, PdfExtractImagesTool
-        from nanobot.agent.tools.ocr import OcrImageTool
+        from nanobot.agent.tools.ocr import OcrImageTool, OcrBatchTool, OcrPdfTool
         from nanobot.agent.tools.pptx import PptxReadTool, PptxCreateTool
         from nanobot.agent.tools.note_search import NoteSearchTool, NoteIndexTool
         from nanobot.agent.tools.return_file import ReturnFileTool
+        from nanobot.agent.tools.file_guide import FileProcessingGuideTool
         
         allowed_dir = self.workspace if self.restrict_to_workspace else None
         for cls in (ReadFileTool, WriteFileTool, EditFileTool, ListDirTool):
@@ -206,10 +211,10 @@ class AgentLoop:
             timeout=self.exec_config.timeout,
             restrict_to_workspace=self.restrict_to_workspace,
         ))
-        self.tools.register(WebSearchTool(api_key=self.web_search_api_key))
+        self.tools.register(WebSearchTool(api_key_getter=lambda: self.web_search_api_key))
         self.tools.register(WebFetchTool())
-        self.tools.register(WeatherTool(api_key=self.weather_api_key))
-        self.tools.register(WeatherForecastTool(api_key=self.weather_api_key))
+        self.tools.register(WeatherTool(api_key_getter=lambda: self.weather_api_key))
+        self.tools.register(WeatherForecastTool(api_key_getter=lambda: self.weather_api_key))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         
         context_packer = ContextPacker(self.workspace)
@@ -237,17 +242,21 @@ class AgentLoop:
         self.tools.register(PdfExtractImagesTool(workspace=self.workspace, allowed_dir=allowed_dir))
         
         self.tools.register(OcrImageTool(workspace=self.workspace, allowed_dir=allowed_dir))
+        self.tools.register(OcrBatchTool(workspace=self.workspace, allowed_dir=allowed_dir))
+        self.tools.register(OcrPdfTool(workspace=self.workspace, allowed_dir=allowed_dir))
         
         self.tools.register(PptxReadTool(workspace=self.workspace, allowed_dir=allowed_dir))
         self.tools.register(PptxCreateTool(workspace=self.workspace, allowed_dir=allowed_dir))
         
         self.tools.register(ReturnFileTool(upload_dir=self.upload_dir))
         
+        self.tools.register(FileProcessingGuideTool(workspace=self.workspace, allowed_dir=allowed_dir))
+        
         from nanobot.agent.tools.cached_result import GetCachedResultTool
         self.tools.register(GetCachedResultTool(context_builder=self.context))
         
         if self.image_generation_config and self.image_generation_config.enabled:
-            from nanobot.agent.tools.image_gen import ImageGenerationTool
+            from nanobot.agent.tools.image_gen import ImageGenerationTool, ImageUnderstandingTool
             from nanobot.providers.image_provider import ImageGenerationProvider
             
             img_provider = ImageGenerationProvider(
@@ -259,8 +268,13 @@ class AgentLoop:
                 workspace=self.workspace,
                 allowed_dir=allowed_dir,
                 image_provider=img_provider,
+                upload_dir=self.upload_dir,
             ))
             logger.info(f"Registered image generation tool with provider: {self.image_generation_config.provider}")
+        
+        from nanobot.agent.tools.image_gen import ImageUnderstandingTool
+        self.tools.register(ImageUnderstandingTool(llm_provider=self.provider))
+        logger.info("Registered image understanding tool")
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -319,10 +333,34 @@ class AgentLoop:
         """Format tool result for progress display."""
         if isinstance(result, str):
             if result.startswith("FILE_RETURNED:"):
-                return result
+                return "文件已准备好下载"
+            if result.startswith("IMAGE_GENERATED:"):
+                return "图片已生成"
             preview = result[:100] + "..." if len(result) > 100 else result
             return f"{tool_name}: {preview}"
         return f"{tool_name}: completed"
+    
+    def _extract_file_info(self, result: str) -> dict | None:
+        """Extract file info from FILE_RETURNED result."""
+        import json
+        if result.startswith("FILE_RETURNED:"):
+            try:
+                json_str = result[len("FILE_RETURNED:"):]
+                return json.loads(json_str)
+            except:
+                return None
+        return None
+    
+    def _extract_generated_images(self, result: str) -> list | None:
+        """Extract generated image info from IMAGE_GENERATED result."""
+        import json
+        if result.startswith("IMAGE_GENERATED:"):
+            try:
+                json_str = result[len("IMAGE_GENERATED:"):]
+                return json.loads(json_str)
+            except:
+                return None
+        return None
 
     async def _run_agent_loop(
         self,
@@ -398,6 +436,71 @@ class AgentLoop:
             )
 
         return final_content, tools_used, messages
+
+    @property
+    def web_search_api_key(self) -> str:
+        if self.config and hasattr(self.config, 'tools'):
+            return getattr(self.config.tools.web.search, 'api_key', None) or self._web_search_api_key or ""
+        return self._web_search_api_key or ""
+
+    @property
+    def weather_api_key(self) -> str:
+        if self.config and hasattr(self.config, 'tools'):
+            return getattr(self.config.tools.weather.weather, 'api_key', None) or self._weather_api_key or ""
+        return self._weather_api_key or ""
+
+    @property
+    def temperature(self) -> float:
+        if self.config and hasattr(self.config.agents.defaults, 'temperature'):
+            return self.config.agents.defaults.temperature
+        return self._temperature
+
+    @property
+    def max_tokens(self) -> int:
+        if self.config and hasattr(self.config.agents.defaults, 'max_tokens'):
+            return self.config.agents.defaults.max_tokens
+        return self._max_tokens
+
+    @property
+    def max_iterations(self) -> int:
+        if self.config and hasattr(self.config.agents.defaults, 'max_tool_iterations'):
+            return self.config.agents.defaults.max_tool_iterations
+        return self._max_iterations
+
+    @property
+    def memory_window(self) -> int:
+        if self.config and hasattr(self.config.agents.defaults, 'memory_window'):
+            return self.config.agents.defaults.memory_window
+        return self._memory_window
+
+    @property
+    def knowledge_enabled(self) -> bool:
+        if self.config and hasattr(self.config.tools.knowledge, 'index'):
+            return getattr(self.config.tools.knowledge.index, 'enabled', True)
+        return True
+
+    @property
+    def knowledge_top_k(self) -> int:
+        if self.config and hasattr(self.config.tools.knowledge, 'search'):
+            return getattr(self.config.tools.knowledge.search, 'default_top_k', 5)
+        return 5
+
+    @property
+    def enable_reasoning(self) -> bool:
+        if self.config and hasattr(self.config.agents.defaults, 'enable_reasoning'):
+            return self.config.agents.defaults.enable_reasoning
+        return True
+
+    @property
+    def channels_config(self):
+        if self.config and hasattr(self.config, 'channels'):
+            return self.config.channels
+        return self._channels_config
+
+    def is_channel_enabled(self, channel_name: str) -> bool:
+        if self.channels_config and hasattr(self.channels_config, channel_name):
+            return getattr(self.channels_config, channel_name).enabled
+        return False
 
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
@@ -477,7 +580,7 @@ class AgentLoop:
                 current_message=msg.content, channel=channel, chat_id=chat_id,
             )
             final_content, _, all_msgs = await self._run_agent_loop(messages)
-            self._save_turn(session, all_msgs, 1 + len(history))
+            self._save_turn(session, all_msgs, 1 + len(history), attachments=[{"path": p} for p in msg.media] if msg.media else None, user_original_content=msg.content)
             self.sessions.save(session)
             return OutboundMessage(channel=channel, chat_id=chat_id,
                                   content=final_content or "Background task completed.")
@@ -553,6 +656,7 @@ class AgentLoop:
             current_message=msg.content,
             media=msg.media if msg.media else None,
             channel=msg.channel, chat_id=msg.chat_id,
+            convert_to_base64=False,
         )
 
         async def _bus_progress(content: str, *, tool_hint: bool = False) -> None:
@@ -573,7 +677,7 @@ class AgentLoop:
         preview = final_content[:120] + "..." if len(final_content) > 120 else final_content
         logger.info("Response to {}:{}: {}", msg.channel, msg.sender_id, preview)
 
-        self._save_turn(session, all_msgs, 1 + len(history))
+        self._save_turn(session, all_msgs, 1 + len(history), attachments=[{"path": p} for p in msg.media] if msg.media else None, user_original_content=msg.content)
         self.sessions.save(session)
         
         self.context.cleanup_tool_cache()
@@ -589,19 +693,85 @@ class AgentLoop:
 
     _TOOL_RESULT_MAX_CHARS = 2000
 
-    def _save_turn(self, session: Session, messages: list[dict], skip: int) -> None:
-        """Save new-turn messages into session, truncating large tool results."""
+    def _save_turn(self, session: Session, messages: list[dict], skip: int, attachments: list[dict] | None = None, user_original_content: str | None = None) -> None:
+        """Save new-turn messages into session, merging tool results into assistant messages."""
         from datetime import datetime
+        import mimetypes
+        import re
+
+        tool_results: dict[str, str] = {}
+
         for m in messages[skip:]:
-            entry = {k: v for k, v in m.items() if k != "reasoning_content"}
-            if entry.get("role") == "tool" and isinstance(entry.get("content"), str):
-                content = entry["content"]
-                if content.startswith("FILE_RETURNED:"):
-                    pass
-                elif len(content) > self._TOOL_RESULT_MAX_CHARS:
-                    entry["content"] = content[:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
-            entry.setdefault("timestamp", datetime.now().isoformat())
-            session.messages.append(entry)
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                tool_results[m["tool_call_id"]] = m.get("content", "")
+
+        merged_messages = []
+        assistant_msg_with_tools = None
+        final_content = ""
+
+        for m in messages[skip:]:
+            entry = {k: v for k, v in m.items()}
+
+            if entry.get("role") == "user":
+                merged_messages.append(entry)
+
+            elif entry.get("role") == "assistant":
+                if entry.get("tool_calls"):
+                    for tc in entry["tool_calls"]:
+                        tc_id = tc.get("id") or tc.get("tool_call_id")
+                        if tc_id and tc_id in tool_results:
+                            tc["result"] = tool_results[tc_id]
+                    if assistant_msg_with_tools is None:
+                        assistant_msg_with_tools = entry
+                        final_content = entry.get("content", "")
+                    else:
+                        assistant_msg_with_tools["tool_calls"].extend(entry.get("tool_calls", []))
+                else:
+                    if assistant_msg_with_tools:
+                        entry["tool_calls"] = assistant_msg_with_tools["tool_calls"]
+                        if final_content and not entry.get("content"):
+                            entry["content"] = final_content
+                    merged_messages.append(entry)
+                    assistant_msg_with_tools = None
+
+            # Skip tool messages (already merged into assistant)
+
+        if assistant_msg_with_tools:
+            assistant_msg_with_tools["content"] = final_content
+            merged_messages.append(assistant_msg_with_tools)
+        
+        for msg in merged_messages:
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                if user_original_content is not None:
+                    msg["content"] = user_original_content
+                elif isinstance(content, list):
+                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"]
+                    msg["content"] = text_parts[0] if text_parts else ""
+                if isinstance(msg.get("content"), str) and len(msg["content"]) > self._TOOL_RESULT_MAX_CHARS:
+                    msg["content"] = msg["content"][:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
+            else:
+                if isinstance(msg.get("content"), str) and len(msg.get("content", "")) > self._TOOL_RESULT_MAX_CHARS:
+                    msg["content"] = msg["content"][:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
+            msg.setdefault("timestamp", datetime.now().isoformat())
+            if attachments and msg.get("role") == "user":
+                enriched_attachments = []
+                for att in attachments:
+                    path = att.get("path", "")
+                    from pathlib import Path
+                    name = att.get("name", Path(path).name) if "name" not in att else att["name"]
+                    mime, _ = mimetypes.guess_type(path)
+                    file_type = "file"
+                    if mime:
+                        if mime.startswith("image/"):
+                            file_type = "image"
+                        elif mime.startswith("application/pdf"):
+                            file_type = "pdf"
+                        elif mime.startswith("application/msword") or mime.startswith("application/vnd.openxmlformats"):
+                            file_type = "doc"
+                    enriched_attachments.append({"path": path, "name": name, "file_type": file_type})
+                msg["attachments"] = enriched_attachments
+            session.messages.append(msg)
         session.updated_at = datetime.now()
 
     async def _consolidate_memory(self, session, archive_all: bool = False) -> bool:
@@ -618,10 +788,11 @@ class AgentLoop:
         channel: str = "cli",
         chat_id: str = "direct",
         on_progress: Callable[[str], Awaitable[None]] | None = None,
+        media: list[str] | None = None,
     ) -> str:
         """Process a message directly (for CLI or cron usage)."""
         await self._connect_mcp()
-        msg = InboundMessage(channel=channel, sender_id="user", chat_id=chat_id, content=content)
+        msg = InboundMessage(channel=channel, sender_id="user", chat_id=chat_id, content=content, media=media or [])
         response = await self._process_message(msg, session_key=session_key, on_progress=on_progress)
         return response.content if response else ""
 
@@ -681,6 +852,7 @@ class AgentLoop:
             channel=channel,
             chat_id=chat_id,
             media=media,
+            convert_to_base64=False,
         )
         
         final_content = None
@@ -688,6 +860,7 @@ class AgentLoop:
         messages = initial_messages
         iteration = 0
         accumulated_content = ""
+        accumulated_reasoning = ""
         total_prompt_tokens = 0
         total_completion_tokens = 0
         total_tokens = 0
@@ -718,6 +891,7 @@ class AgentLoop:
                                 await on_chunk(chunk)
                         
                         elif chunk.type == "reasoning_delta":
+                            accumulated_reasoning += chunk.content or ""
                             if on_chunk:
                                 await on_chunk(chunk)
                         
@@ -765,6 +939,7 @@ class AgentLoop:
                     ]
                     messages = self.context.add_assistant_message(
                         messages, iteration_content, tool_call_dicts,
+                        reasoning_content=accumulated_reasoning or None,
                     )
                     
                     for tool_call in tool_calls:
@@ -781,10 +956,17 @@ class AgentLoop:
                         
                         if on_chunk:
                             result_preview = self._format_tool_result(tool_call.name, result)
+                            metadata = {"tool_name": tool_call.name}
+                            file_info = self._extract_file_info(result)
+                            if file_info:
+                                metadata["file_info"] = file_info
+                            generated_images = self._extract_generated_images(result)
+                            if generated_images:
+                                metadata["generated_images"] = generated_images
                             await on_chunk(StreamChunk(
                                 type="tool_result",
                                 content=result_preview,
-                                metadata={"tool_name": tool_call.name}
+                                metadata=metadata
                             ))
                         
                         messages = self.context.add_tool_result(
@@ -792,6 +974,7 @@ class AgentLoop:
                         )
                     
                     accumulated_content = ""
+                    accumulated_reasoning = ""
                 else:
                     final_content = self._strip_think(iteration_content) or iteration_content
                     messages = self.context.add_assistant_message(messages, final_content)
@@ -805,7 +988,7 @@ class AgentLoop:
                 if on_chunk:
                     await on_chunk(StreamChunk(type="text_delta", content=final_content))
             
-            self._save_turn(session, messages, 1 + len(history))
+            self._save_turn(session, messages, 1 + len(history), attachments=[{"path": p} for p in media] if media else None, user_original_content=content)
             logger.info(f"[Stream] Token stats: prompt={total_prompt_tokens}, completion={total_completion_tokens}, total={total_tokens}, model={used_model}")
             if total_tokens > 0:
                 session.total_prompt_tokens += total_prompt_tokens
@@ -826,6 +1009,6 @@ class AgentLoop:
         
         except asyncio.CancelledError:
             if accumulated_content:
-                self._save_turn(session, messages, 1 + len(history))
+                self._save_turn(session, messages, 1 + len(history), attachments=[{"path": p} for p in media] if media else None, user_original_content=content)
                 self.sessions.save(session)
             raise

@@ -88,13 +88,16 @@ class WebSearchTool(Tool):
         "required": ["query"]
     }
     
-    def __init__(self, api_key: str | None = None, max_results: int = 10):
+    def __init__(self, api_key: str | None = None, max_results: int = 10, api_key_getter=None):
         self._init_api_key = api_key
         self.max_results = max_results
+        self._api_key_getter = api_key_getter
 
     @property
     def api_key(self) -> str:
         """Resolve API key at call time so env/config changes are picked up."""
+        if self._api_key_getter:
+            return self._api_key_getter() or ""
         return self._init_api_key or os.environ.get("BOCHA_API_KEY", "")
 
     async def execute(

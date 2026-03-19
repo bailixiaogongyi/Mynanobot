@@ -142,20 +142,25 @@ class EditFileTool(Tool):
                 "path": {
                     "type": "string",
                     "description": "The file path to edit"
-                },
-                "old_text": {
-                    "type": "string",
-                    "description": "The exact text to find and replace"
-                },
-                "new_text": {
-                    "type": "string",
-                    "description": "The text to replace with"
-                }
             },
-            "required": ["path", "old_text", "new_text"]
-        }
+            "old_text": {
+                "type": "string",
+                "description": "The exact text to find and replace"
+            },
+            "new_text": {
+                "type": "string",
+                "description": "The text to replace with"
+            },
+            "replace_all": {
+                "type": "boolean",
+                "description": "If true, replace all occurrences. Default: false",
+                "default": False
+            }
+        },
+        "required": ["path", "old_text", "new_text"]
+    }
     
-    async def execute(self, path: str, old_text: str, new_text: str, **kwargs: Any) -> str:
+    async def execute(self, path: str, old_text: str, new_text: str, replace_all: bool = False, **kwargs: Any) -> str:
         try:
             file_path = _resolve_path(path, self._workspace, self._allowed_dir)
             if not file_path.exists():
@@ -172,14 +177,18 @@ class EditFileTool(Tool):
                 return self._not_found_message(old_text, content, path)
 
             count = content.count(old_text)
-            if count > 1:
-                return f"Warning: old_text appears {count} times. Please provide more context to make it unique."
+            if count > 1 and not replace_all:
+                return f"Warning: old_text appears {count} times. Use replace_all=true to replace all occurrences, or provide more context to make it unique."
 
-            new_content = content.replace(old_text, new_text, 1)
+            if replace_all:
+                new_content = content.replace(old_text, new_text)
+            else:
+                new_content = content.replace(old_text, new_text, 1)
             async with aiofiles.open(file_path, mode="w", encoding="utf-8") as f:
                 await f.write(new_content)
 
-            return f"Successfully edited {file_path}"
+            replaced_count = count if replace_all else 1
+            return f"Successfully edited {file_path} ({replaced_count} replacement{'s' if replaced_count > 1 else ''})"
         except PermissionError as e:
             return f"Error: {e}"
         except Exception as e:

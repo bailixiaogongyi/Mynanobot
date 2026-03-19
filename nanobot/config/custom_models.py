@@ -17,17 +17,59 @@ def get_custom_models_path() -> Path:
     return data_dir / "custom_models.json"
 
 
+def _sync_builtin_models() -> None:
+    """Sync built-in models from provider_models.py to custom_models.json.
+
+    This is only called ONCE when the file is first created.
+    After that, user modifications are respected and not overwritten.
+    """
+    try:
+        from nanobot.providers.provider_models import PROVIDER_MODELS
+    except ImportError:
+        return
+
+    path = get_custom_models_path()
+
+    models = {}
+
+    for spec in PROVIDER_MODELS:
+        provider = spec.provider
+        model_id = spec.model_id
+
+        if provider not in models:
+            models[provider] = {}
+
+        models[provider][model_id] = {
+            "display_name": spec.display_name,
+            "description": spec.description,
+            "max_tokens": spec.max_tokens,
+            "supports_vision": spec.supports_vision,
+            "supports_function_calling": spec.supports_function_calling,
+            "supports_streaming": spec.supports_streaming,
+            "input_price": spec.input_price,
+            "output_price": spec.output_price,
+            "currency": spec.currency,
+            "token_quota": spec.token_quota,
+            "token_used": spec.token_used,
+            "status": spec.status,
+            "is_custom": False,
+        }
+
+    save_custom_models(models)
+
+
 def load_custom_models() -> dict[str, dict[str, Any]]:
     """Load custom model configurations from file.
-    
+
     Returns:
         Dictionary mapping provider name to model configurations.
         Format: {provider_name: {model_id: model_config}}
     """
     path = get_custom_models_path()
+
     if not path.exists():
-        return {}
-    
+        _sync_builtin_models()
+
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)

@@ -186,6 +186,7 @@ class AgentDefaults(Base):
 
     workspace: str = "~/.nanobot/workspace"
     model: str = "anthropic/claude-opus-4-5"
+    provider: str = "anthropic"
     max_tokens: int = 8192
     temperature: float = 0.1
     max_tool_iterations: int = 30
@@ -311,6 +312,7 @@ class GatewayConfig(Base):
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
+    enabled: bool = True
     api_key: str = ""  # Bocha Search API key (博查搜索)
     max_results: int = 10
 
@@ -318,6 +320,7 @@ class WebSearchConfig(Base):
 class WeatherConfig(Base):
     """Weather tool configuration."""
 
+    enabled: bool = True
     api_key: str = ""  # Seniverse API key (心知天气)
 
 
@@ -408,6 +411,7 @@ class ToolsConfig(Base):
     image_generation: ImageGenerationConfig = Field(default_factory=ImageGenerationConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
+    mcp_enabled: bool = False
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
 
 
@@ -428,7 +432,16 @@ class Config(BaseSettings):
 
     def _match_provider(self, model: str | None = None) -> tuple["ProviderConfig | None", str | None]:
         """Match provider config and its registry name. Returns (config, spec_name)."""
-        from nanobot.providers.registry import PROVIDERS
+        from nanobot.providers.registry import PROVIDERS, find_by_name
+
+        # Use explicit provider from config if available
+        explicit_provider = self.agents.defaults.provider
+        if explicit_provider:
+            spec = find_by_name(explicit_provider)
+            if spec:
+                p = getattr(self.providers, spec.name, None)
+                if p and p.api_key:
+                    return p, spec.name
 
         model_lower = (model or self.agents.defaults.model).lower()
         model_normalized = model_lower.replace("-", "_")

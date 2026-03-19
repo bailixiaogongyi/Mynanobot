@@ -67,7 +67,7 @@ class Session:
         out: list[dict[str, Any]] = []
         for m in sliced:
             entry: dict[str, Any] = {"role": m["role"], "content": m.get("content", "")}
-            for k in ("tool_calls", "tool_call_id", "name", "timestamp"):
+            for k in ("tool_calls", "tool_call_id", "name", "timestamp", "reasoning_content"):
                 if k in m:
                     entry[k] = m[k]
             out.append(entry)
@@ -98,6 +98,11 @@ class Session:
         """Clear all messages and reset session to initial state."""
         self.messages = []
         self.last_consolidated = 0
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_tokens = 0
+        self.request_count = 0
+        self.used_model = ""
         self.updated_at = datetime.now()
 
 
@@ -206,14 +211,20 @@ class SessionManager:
             total_tokens = 0
             request_count = 0
             used_model = ""
+            corrupted_lines = 0
 
             with open(path, encoding="utf-8") as f:
-                for line in f:
+                for line_num, line in enumerate(f, 1):
                     line = line.strip()
                     if not line:
                         continue
 
-                    data = json.loads(line)
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        corrupted_lines += 1
+                        logger.warning("Session {} has corrupted JSON at line {}: {}", key, line_num, e)
+                        continue
 
                     if data.get("_type") == "metadata":
                         metadata = data.get("metadata", {})
@@ -227,10 +238,20 @@ class SessionManager:
                     else:
                         messages.append(data)
 
+            if corrupted_lines > 0:
+                logger.warning("Session {} loaded with {} corrupted lines skipped", key, corrupted_lines)
+
+            if created_at is None:
+                try:
+                    file_mtime = path.stat().st_mtime
+                    created_at = datetime.fromtimestamp(file_mtime)
+                except Exception:
+                    created_at = datetime.now()
+
             return Session(
                 key=key,
                 messages=messages,
-                created_at=created_at or datetime.now(),
+                created_at=created_at,
                 metadata=metadata,
                 last_consolidated=last_consolidated,
                 total_prompt_tokens=total_prompt_tokens,

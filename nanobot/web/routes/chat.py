@@ -31,6 +31,7 @@ class ChatMessage(BaseModel):
 
     content: str
     chat_id: str = "default"
+    attachments: list[dict[str, Any]] = []
 
 
 class ChatResponse(BaseModel):
@@ -99,12 +100,17 @@ async def send_message(message: ChatMessage, request: Request) -> ChatResponse:
     agent = _get_agent(request)
     session_key = _get_session_key(message.chat_id)
 
+    media = None
+    if message.attachments:
+        media = [att.get("path", "") for att in message.attachments if att.get("path")]
+
     try:
         response = await agent.process_direct(
             message.content,
             session_key=session_key,
             channel=CHANNEL_PREFIX,
             chat_id=message.chat_id,
+            media=media,
         )
         return ChatResponse(
             content=response or "",
@@ -247,10 +253,24 @@ async def websocket_chat(websocket: WebSocket, chat_id: str):
                 
                 if isinstance(msg, dict) and "content" in msg:
                     content = msg.get("content", "")
-                    attachments = msg.get("attachments", [])
+                    raw_attachments = msg.get("attachments", [])
+                    if raw_attachments and isinstance(raw_attachments, list):
+                        media = [att.get("path", "") for att in raw_attachments if att.get("path")]
+                    else:
+                        media = []
                     data = content
-            except json.JSONDecodeError:
-                pass
+                else:
+                    media = []
+                    data = ""
+            except json.JSONDecodeError as e:
+                logger.warning(f"[WS] Invalid JSON received from {chat_id}: {e}")
+                await websocket.send_json({
+                    "type": "error",
+                    "content": "Invalid message format. Please send valid JSON.",
+                    "chat_id": chat_id,
+                    "timestamp": datetime.now().isoformat(),
+                })
+                continue
 
             try:
                 logger.info(f"[WS] Calling process_stream for chat_id={chat_id}")
@@ -262,7 +282,7 @@ async def websocket_chat(websocket: WebSocket, chat_id: str):
                         channel=CHANNEL_PREFIX,
                         chat_id=chat_id,
                         on_chunk=send_chunk,
-                        media=attachments if attachments else None,
+                        media=media if media else None,
                     )
                 
                 stream_task = asyncio.create_task(run_stream())

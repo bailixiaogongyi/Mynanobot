@@ -58,12 +58,13 @@ class RoleManager:
         except Exception as e:
             return {"success": False, "message": str(e)}
     
-    def update_role(self, role_key: str, role_data: dict[str, Any]) -> dict[str, Any]:
+    def update_role(self, role_key: str, role_data: dict[str, Any], persist: bool = True) -> dict[str, Any]:
         """Update a role dynamically (runtime modification).
         
         Args:
             role_key: The role identifier to update.
             role_data: Dictionary containing role configuration.
+            persist: Whether to persist changes to YAML file.
             
         Returns:
             Dictionary with update status.
@@ -72,14 +73,64 @@ class RoleManager:
             if role_key in self.roles:
                 role = RoleDefinition.from_dict(role_key, role_data)
                 self.roles[role_key] = role
+                
+                if persist:
+                    persist_result = self._save_to_yaml()
+                    if not persist_result["success"]:
+                        return {"success": False, "message": f"Role updated but failed to persist: {persist_result['message']}"}
+                
                 return {"success": True, "message": f"Role '{role_key}' updated"}
             else:
                 if role_data.get("enabled", True):
                     role = RoleDefinition.from_dict(role_key, role_data)
                     self.roles[role_key] = role
+                    
+                    if persist:
+                        persist_result = self._save_to_yaml()
+                        if not persist_result["success"]:
+                            return {"success": False, "message": f"Role created but failed to persist: {persist_result['message']}"}
+                    
                     return {"success": True, "message": f"Role '{role_key}' created"}
                 return {"success": False, "message": f"Role '{role_key}' not found and cannot be created (enabled=false)"}
         except Exception as e:
+            return {"success": False, "message": str(e)}
+    
+    def _save_to_yaml(self) -> dict[str, Any]:
+        """Save all roles to YAML configuration file.
+        
+        Returns:
+            Dictionary with save status.
+        """
+        if not self._config_path:
+            return {"success": False, "message": "No config path set"}
+        
+        try:
+            existing_data = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding="utf-8") as f:
+                    existing_data = yaml.safe_load(f) or {}
+            
+            roles_data = existing_data.get("roles", {})
+            
+            for role_key, role in self.roles.items():
+                roles_data[role_key] = role.to_dict()
+            
+            existing_data["roles"] = roles_data
+            
+            import tempfile
+            import shutil
+            
+            temp_path = self._config_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
+                yaml.dump(existing_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            
+            shutil.move(str(temp_path), str(self._config_path))
+            
+            logger.info(f"Saved roles to {self._config_path}")
+            return {"success": True, "message": "Roles saved successfully"}
+            
+        except Exception as e:
+            logger.error(f"Failed to save roles to {self._config_path}: {e}")
             return {"success": False, "message": str(e)}
     
     def get_role_config(self, role_key: str) -> dict[str, Any] | None:
@@ -188,6 +239,10 @@ class RoleManager:
             "researcher": [
                 "研究", "research", "调研", "调查", "检索", "search",
                 "资料", "information", "查找", "find", "收集", "collect",
+            ],
+            "image_processor": [
+                "图片", "图像", "image", "图片识别", "图片分析", "看图",
+                "生成图片", "画图", "文生图", "视觉", "vision", "ocr",
             ],
         }
         

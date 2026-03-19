@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from typing import Any
 
 router = APIRouter()
@@ -41,12 +41,12 @@ async def get_task_detail(task_id: str, request: Request):
     task_manager = getattr(request.app.state, 'task_manager', None)
 
     if not task_manager:
-        return {"error": "Task manager not available"}, 404
+        raise HTTPException(status_code=404, detail="Task manager not available")
 
     task = task_manager.get_task(task_id)
 
     if not task:
-        return {"error": "Task not found"}, 404
+        raise HTTPException(status_code=404, detail="Task not found")
 
     return {
         "id": task.id,
@@ -180,7 +180,16 @@ async def get_stats(request: Request):
     task_manager = getattr(request.app.state, 'task_manager', None)
 
     if not task_manager:
-        return {"error": "Task manager not available"}
+        return {
+            "total": 0,
+            "completed": 0,
+            "failed": 0,
+            "running": 0,
+            "pending": 0,
+            "success_rate": 0,
+            "avg_duration_seconds": 0,
+            "error": "Task manager not available"
+        }
 
     tasks = list(task_manager.tasks.values())
 

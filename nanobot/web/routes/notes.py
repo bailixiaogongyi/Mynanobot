@@ -80,6 +80,9 @@ class IndexResponse(BaseModel):
 
 def _get_workspace(request) -> Path:
     """Get workspace path from app state."""
+    if not hasattr(request.app.state, "config") or request.app.state.config is None:
+        logger.error("config not found in app.state")
+        raise HTTPException(status_code=500, detail="Server configuration not initialized")
     return request.app.state.config.workspace_path
 
 
