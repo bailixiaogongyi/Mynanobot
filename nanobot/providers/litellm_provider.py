@@ -43,6 +43,12 @@ class LiteLLMProvider(LLMProvider):
         # provider_name (from config key) is the primary signal;
         # api_key / api_base are fallback for auto-detection.
         self._gateway = find_gateway(provider_name, api_key, api_base)
+        self._gateway_provider: str | None = None  # LiteLLM provider name for gateway mode
+
+        if self._gateway:
+            logger.info(f"[LiteLLMProvider] Gateway mode: provider_name={provider_name}, litellm_prefix={self._gateway.litellm_prefix}")
+        else:
+            logger.warning(f"[LiteLLMProvider] No gateway detected: provider_name={provider_name}, api_key={'set' if api_key else None}, api_base={api_base}")
         
         # Configure environment variables
         if api_key:
@@ -92,22 +98,32 @@ class LiteLLMProvider(LLMProvider):
         return self.api_base
     
     def _resolve_model(self, model: str) -> str:
-        """Resolve model name by applying provider/gateway prefixes."""
+        """Resolve model name.
+
+        For gateway mode, returns the model without prefix and sets _gateway_provider.
+        For standard mode, adds provider prefix if needed.
+        """
         if self._gateway:
-            # Gateway mode: apply gateway prefix, skip provider-specific prefixes
-            prefix = self._gateway.litellm_prefix
-            if self._gateway.strip_model_prefix:
+            # Gateway mode: strip prefix if needed, return model as-is
+            if self._gateway.strip_model_prefix and "/" in model:
                 model = model.split("/")[-1]
-            if prefix and not model.startswith(f"{prefix}/"):
-                model = f"{prefix}/{model}"
+            self._gateway_provider = self._gateway.litellm_prefix
             return model
-        
+
         # Standard mode: auto-prefix for known providers
+        # Skip if model already has multi-level format (e.g., "Pro/deepseek-ai/DeepSeek-V3.2")
+        if model.count("/") >= 2:
+            self._gateway_provider = None
+            return model
+
         spec = find_by_model(model)
         if spec and spec.litellm_prefix:
             model = self._canonicalize_explicit_prefix(model, spec.name, spec.litellm_prefix)
             if not any(model.startswith(s) for s in spec.skip_prefixes):
                 model = f"{spec.litellm_prefix}/{model}"
+            self._gateway_provider = None
+        else:
+            self._gateway_provider = None
 
         return model
 
@@ -234,23 +250,27 @@ class LiteLLMProvider(LLMProvider):
         Returns:
             LLMResponse with content and/or tool calls.
         """
-        original_model = model or self.default_model
-        model = self._resolve_model(original_model)
+        model = model or self.default_model
+        model = self._resolve_model(model)
 
-        if self._supports_cache_control(original_model):
+        if self._supports_cache_control(model):
             messages, tools = self._apply_cache_control(messages, tools)
 
         # Clamp max_tokens to at least 1 — negative or zero values cause
         # LiteLLM to reject the request with "max_tokens must be at least 1".
         max_tokens = max(1, max_tokens)
-        
+
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": self._sanitize_messages(self._sanitize_empty_content(messages)),
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-        
+
+        # Pass custom_llm_provider for gateway mode instead of prefixing model name
+        if self._gateway_provider:
+            kwargs["custom_llm_provider"] = self._gateway_provider
+
         # Apply model-specific overrides (e.g. kimi-k2.5 temperature)
         self._apply_model_overrides(model, kwargs)
         
@@ -302,14 +322,14 @@ class LiteLLMProvider(LLMProvider):
         Yields:
             StreamChunk objects representing incremental response.
         """
-        original_model = model or self.default_model
-        model = self._resolve_model(original_model)
+        model = model or self.default_model
+        model = self._resolve_model(model)
 
-        if self._supports_cache_control(original_model):
+        if self._supports_cache_control(model):
             messages, tools = self._apply_cache_control(messages, tools)
 
         max_tokens = max(1, max_tokens)
-        
+
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": self._sanitize_messages(self._sanitize_empty_content(messages)),
@@ -318,7 +338,11 @@ class LiteLLMProvider(LLMProvider):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
-        
+
+        # Pass custom_llm_provider for gateway mode instead of prefixing model name
+        if self._gateway_provider:
+            kwargs["custom_llm_provider"] = self._gateway_provider
+
         user_msg_after = next((m for m in kwargs['messages'] if m.get("role") == "user"), None)
         if user_msg_after:
             logger.info(f"[LiteLLM] User message after sanitize: {str(user_msg_after.get('content', ''))[:500]}...")

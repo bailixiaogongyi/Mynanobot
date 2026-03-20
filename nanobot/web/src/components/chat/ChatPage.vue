@@ -392,7 +392,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, watch } from "vue";
 import { marked } from "marked";
 import { useChatStore } from "@/stores/chat";
 import { useUIStore } from "@/stores/ui";
@@ -575,26 +575,31 @@ const scrollToBottom = () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTo({
       top: messagesContainer.value.scrollHeight,
-      behavior: "smooth",
+      behavior: "instant",
     });
   }
 };
 
 watch(
-  () => chatStore.messages.length,
-  (newLen, oldLen) => {
-    if (newLen > (oldLen || 0)) {
-      nextTick(() => scrollToBottom());
-    }
+  () => chatStore.messages,
+  () => {
+    nextTick(() => scrollToBottom());
   },
+  { deep: true },
 );
 
 onMounted(async () => {
   await chatStore.loadHistory();
   await chatStore.loadConfig();
   chatStore.initWebSocket();
-  scrollToBottom();
-  nextTick(() => autoResizeTextarea());
+  setTimeout(() => {
+    scrollToBottom();
+    autoResizeTextarea();
+  }, 200);
+});
+
+onActivated(() => {
+  nextTick(() => scrollToBottom());
 });
 
 onUnmounted(() => {

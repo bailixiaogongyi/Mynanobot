@@ -17,368 +17,167 @@
       </div>
       <div class="config-main">
         <!-- 总览 -->
-        <div v-if="activeSection === 'overview'" class="config-section">
-          <div class="service-overview-card">
-            <div class="overview-header">
-              <h3 class="overview-title">服务状态总览</h3>
+        <div v-if="activeSection === 'overview'" class="config-section overview-section">
+          <!-- 上层：服务状态卡片 -->
+          <div class="service-status-card">
+            <div class="status-header">
+              <div class="status-indicator online"></div>
+              <span class="status-text">服务运行中</span>
             </div>
-            <div class="service-overview">
-              <div class="overview-main">
-                <div class="overview-stat">
-                  <svg
-                    class="overview-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"
-                    />
-                    <circle cx="8" cy="14" r="2" />
-                    <circle cx="16" cy="14" r="2" />
-                  </svg>
-                  <div class="overview-info">
-                    <span class="overview-label">当前模型</span>
-                    <span class="overview-value">{{
-                      getModelDisplayName(config.model?.current) || "未设置"
-                    }}</span>
+            <div class="current-model-section">
+              <div class="model-info-cards">
+                <div class="model-info-card">
+                  <div class="info-card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                      <circle cx="8" cy="14" r="2"/>
+                      <circle cx="16" cy="14" r="2"/>
+                    </svg>
+                  </div>
+                  <div class="info-card-content">
+                    <span class="info-card-label">当前模型</span>
+                    <span class="info-card-value">{{ config.model?.current || "未设置" }}</span>
                   </div>
                 </div>
-                <div class="overview-stat">
-                  <svg
-                    class="overview-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                    <line x1="8" y1="21" x2="16" y2="21" />
-                    <line x1="12" y1="17" x2="12" y2="21" />
-                  </svg>
-                  <div class="overview-info">
-                    <span class="overview-label">供应商</span>
-                    <span class="overview-value">{{
-                      currentProviderName
-                    }}</span>
+                <div class="model-info-card">
+                  <div class="info-card-icon provider">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                      <line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                  </div>
+                  <div class="info-card-content">
+                    <span class="info-card-label">供应商</span>
+                    <span class="info-card-value provider">{{ currentProviderName || "未设置" }}</span>
                   </div>
                 </div>
               </div>
-              <div class="overview-modules">
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  <span class="module-label">思考过程</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      agentDefaults.enable_reasoning
-                        ? 'text-success'
-                        : 'text-muted',
-                    ]"
-                  >
-                    {{ agentDefaults.enable_reasoning ? "已启用" : "已禁用" }}
-                  </span>
-                </div>
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-                    />
-                  </svg>
-                  <span class="module-label">工具调用</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      agentDefaults.max_tool_iterations > 0
-                        ? 'text-success'
-                        : 'text-muted',
-                    ]"
-                  >
-                    {{
-                      agentDefaults.max_tool_iterations > 0
-                        ? `已启用 (最大 ${agentDefaults.max_tool_iterations} 次)`
-                        : "已禁用"
-                    }}
-                  </span>
-                </div>
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-                    />
-                  </svg>
-                  <span class="module-label">通信渠道</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      enabledChannelsCount > 0 ? 'text-success' : 'text-muted',
-                    ]"
-                  >
-                    {{ enabledChannelsCount }} /
-                    {{ config.channels?.length || 0 }} 已启用
-                  </span>
-                </div>
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path
-                      d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
-                    />
-                  </svg>
-                  <span class="module-label">知识检索</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      config.knowledge?.enabled ? 'text-success' : 'text-muted',
-                    ]"
-                  >
-                    {{ config.knowledge?.enabled ? "已启用" : "已禁用" }}
-                  </span>
-                </div>
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <span class="module-label">文件上传</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      upload.enabled ? 'text-success' : 'text-muted',
-                    ]"
-                  >
-                    {{ upload.enabled ? "已启用" : "已禁用" }}
-                  </span>
-                </div>
-                <div class="module-status-item">
-                  <svg
-                    class="module-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="2" y1="12" x2="22" y2="12" />
-                    <path
-                      d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-                    />
-                  </svg>
-                  <span class="module-label">Web UI</span>
-                  <span
-                    :class="[
-                      'module-value',
-                      gateway?.web_ui_enabled ? 'text-success' : 'text-muted',
-                    ]"
-                  >
-                    {{
-                      gateway?.web_ui_enabled
-                        ? `运行中 (端口 ${gateway.web_ui_port})`
-                        : "已禁用"
-                    }}
-                  </span>
-                </div>
+            </div>
+            <div class="modules-grid">
+              <div class="module-chip" :class="{ active: agentDefaults.enable_reasoning }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span class="chip-label">思考</span>
+                <span class="chip-status">{{ agentDefaults.enable_reasoning ? "✓" : "✗" }}</span>
+              </div>
+              <div class="module-chip" :class="{ active: agentDefaults.max_tool_iterations > 0 }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+                <span class="chip-label">工具</span>
+                <span class="chip-status">{{ agentDefaults.max_tool_iterations > 0 ? "✓" : "✗" }}</span>
+              </div>
+              <div class="module-chip" :class="{ active: config.knowledge?.enabled }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span class="chip-label">知识</span>
+                <span class="chip-status">{{ config.knowledge?.enabled ? "✓" : "✗" }}</span>
+              </div>
+              <div class="module-chip" :class="{ active: upload.enabled }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span class="chip-label">上传</span>
+                <span class="chip-status">{{ upload.enabled ? "✓" : "✗" }}</span>
+              </div>
+              <div class="module-chip" :class="{ active: enabledChannelsCount > 0 }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                <span class="chip-label">渠道</span>
+                <span class="chip-status">{{ enabledChannelsCount }}/{{ config.channels?.length || 0 }}</span>
+              </div>
+              <div class="module-chip" :class="{ active: gateway?.web_ui_enabled }">
+                <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <span class="chip-label">UI</span>
+                <span class="chip-status">{{ gateway?.web_ui_enabled ? "✓" : "✗" }}</span>
               </div>
             </div>
           </div>
 
-          <div class="token-stats-card">
-            <div class="overview-header">
-              <h3 class="overview-title">Token 使用统计</h3>
-              <div class="period-selector">
+          <!-- 中层：Token消耗概览 -->
+          <div class="token-overview-card">
+            <div class="token-card-header">
+              <h3 class="token-card-title">Token 消耗</h3>
+              <div class="period-tabs">
                 <button
                   v-for="period in tokenPeriods"
                   :key="period.value"
-                  :class="[
-                    'period-btn',
-                    { active: tokenPeriod === period.value },
-                  ]"
+                  :class="['period-tab', { active: tokenPeriod === period.value }]"
                   @click="loadTokenStats(period.value)"
                 >
                   {{ period.label }}
                 </button>
               </div>
             </div>
-            <div class="token-stats-summary">
-              <div class="token-stat token-stat-primary">
-                <div class="token-stat-icon">📊</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    formatNumber(tokenStats.total_tokens)
-                  }}</span>
-                  <span class="token-stat-label">Token 总数</span>
-                </div>
+            <div class="token-metrics">
+              <div class="metric-card primary">
+                <div class="metric-number">{{ formatNumber(tokenStats.total_tokens) }}</div>
+                <div class="metric-title">总Token</div>
               </div>
-              <div class="token-stat">
-                <div class="token-stat-icon">📥</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    formatNumber(tokenStats.total_prompt_tokens)
-                  }}</span>
-                  <span class="token-stat-label">输入 Token</span>
-                </div>
+              <div class="metric-card">
+                <div class="metric-number">{{ formatNumber(tokenStats.total_prompt_tokens) }}</div>
+                <div class="metric-title">输入</div>
               </div>
-              <div class="token-stat">
-                <div class="token-stat-icon">📤</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    formatNumber(tokenStats.total_completion_tokens)
-                  }}</span>
-                  <span class="token-stat-label">输出 Token</span>
-                </div>
+              <div class="metric-card">
+                <div class="metric-number">{{ formatNumber(tokenStats.total_completion_tokens) }}</div>
+                <div class="metric-title">输出</div>
               </div>
-              <div class="token-stat">
-                <div class="token-stat-icon">🔄</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    tokenStats.total_requests
-                  }}</span>
-                  <span class="token-stat-label">请求次数</span>
-                </div>
-              </div>
-              <div class="token-stat">
-                <div class="token-stat-icon">👥</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    tokenStats.active_sessions
-                  }}</span>
-                  <span class="token-stat-label">活跃会话</span>
-                </div>
-              </div>
-              <div
-                class="token-stat token-stat-cost"
-                v-if="tokenStats.estimated_cost"
-              >
-                <div class="token-stat-icon">💰</div>
-                <div class="token-stat-content">
-                  <span class="token-stat-value">{{
-                    formatCurrency(
-                      tokenStats.estimated_cost,
-                      tokenStats.currency,
-                    )
-                  }}</span>
-                  <span class="token-stat-label">预估费用</span>
-                </div>
+              <div class="metric-card">
+                <div class="metric-number cost">{{ formatCurrency(tokenStats.estimated_cost || 0, tokenStats.currency || 'CNY') }}</div>
+                <div class="metric-title">费用</div>
               </div>
             </div>
+          </div>
 
-            <!-- 按模型展示消耗 -->
-            <div
-              v-if="tokenStats.by_model && tokenStats.by_model.length > 0"
-              class="token-by-model"
-            >
-              <h4 class="by-model-title">按模型统计</h4>
-              <div class="model-stats-grid">
-                <div
-                  v-for="modelStat in tokenStats.by_model"
-                  :key="modelStat.model || modelStat.model_id"
-                  class="model-stat-card"
-                >
-                  <div class="model-stat-header">
-                    <div class="model-info">
-                      <div class="model-stat-name-row">
-                        <span class="model-stat-name">{{
-                          getModelDisplayName(
-                            modelStat.model || modelStat.model_id,
-                          ) || "未知模型"
-                        }}</span>
-                        <span class="model-stat-provider">{{
-                          getProviderDisplayName(modelStat.provider || "")
-                        }}</span>
-                      </div>
+          <!-- 下层：模型使用情况 -->
+          <div class="model-usage-section" v-if="tokenStats.by_model && tokenStats.by_model.length > 0">
+            <h3 class="section-title">模型消耗详情</h3>
+            <div class="model-usage-grid">
+              <div
+                v-for="modelStat in tokenStats.by_model"
+                :key="modelStat.model || modelStat.model_id"
+                class="model-usage-card"
+              >
+                <div class="usage-left">
+                  <div class="usage-model-name">{{ modelStat.model || modelStat.model_id || "未知模型" }}</div>
+                  <div class="usage-provider-tag">{{ getProviderDisplayName(modelStat.provider || "") }}</div>
+                </div>
+                <div class="usage-right">
+                  <div class="usage-stats-row">
+                    <div class="usage-stat-item">
+                      <span class="stat-value">{{ formatNumber(modelStat.total_prompt_tokens) }}</span>
+                      <span class="stat-label">输入</span>
+                    </div>
+                    <div class="usage-stat-item">
+                      <span class="stat-value">{{ formatNumber(modelStat.total_completion_tokens) }}</span>
+                      <span class="stat-label">输出</span>
+                    </div>
+                    <div class="usage-stat-item">
+                      <span class="stat-value">{{ modelStat.request_count || 0 }}</span>
+                      <span class="stat-label">请求</span>
+                    </div>
+                    <div class="usage-stat-item" v-if="modelStat.estimated_cost">
+                      <span class="stat-value cost">{{ formatCurrency(modelStat.estimated_cost || 0, modelStat.currency || "CNY") }}</span>
+                      <span class="stat-label">费用</span>
                     </div>
                   </div>
-                  <div class="model-stat-metrics">
-                    <div class="metric-item">
-                      <span class="metric-icon">📥</span>
-                      <div class="metric-info">
-                        <span class="metric-value">{{
-                          formatNumber(modelStat.total_prompt_tokens)
-                        }}</span>
-                        <span class="metric-label">输入</span>
-                      </div>
+                  <div class="usage-progress">
+                    <div class="progress-track">
+                      <div class="progress-bar" :style="{ width: getModelUsagePercent(modelStat) + '%' }"></div>
                     </div>
-                    <div class="metric-item">
-                      <span class="metric-icon">📤</span>
-                      <div class="metric-info">
-                        <span class="metric-value">{{
-                          formatNumber(modelStat.total_completion_tokens)
-                        }}</span>
-                        <span class="metric-label">输出</span>
-                      </div>
-                    </div>
-                    <div class="metric-item">
-                      <span class="metric-icon">🔄</span>
-                      <div class="metric-info">
-                        <span class="metric-value">{{
-                          modelStat.request_count || 0
-                        }}</span>
-                        <span class="metric-label">请求</span>
-                      </div>
-                    </div>
-                    <div
-                      class="metric-item metric-cost"
-                      v-if="modelStat.estimated_cost"
-                    >
-                      <span class="metric-icon">💰</span>
-                      <div class="metric-info">
-                        <span class="metric-value">{{
-                          formatCurrency(
-                            modelStat.estimated_cost || 0,
-                            modelStat.currency || "CNY",
-                          )
-                        }}</span>
-                        <span class="metric-label">费用</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="model-stat-progress">
-                    <div class="progress-bar">
-                      <div
-                        class="progress-fill"
-                        :style="{
-                          width: getModelUsagePercent(modelStat) + '%',
-                        }"
-                      ></div>
-                    </div>
-                    <span class="progress-label"
-                      >{{ getModelUsagePercent(modelStat) }}%</span
-                    >
+                    <span class="progress-percent">{{ getModelUsagePercent(modelStat) }}%</span>
                   </div>
                 </div>
               </div>
@@ -1135,9 +934,8 @@
                       }}
                     </span>
                     <span v-if="role.model_config" class="model-detail">
-                      {{ role.model_config.provider }}/{{
-                        role.model_config.model
-                      }}
+                      <span class="model-provider">{{ role.model_config.provider }}</span>
+                      <span class="model-name">{{ role.model_config.model }}</span>
                     </span>
                   </div>
                 </div>
@@ -1778,11 +1576,9 @@ const sections = [
 ];
 
 const currentProviderName = computed(() => {
-  const current = config.value.model?.current || "";
-  let providerName = "";
-  if (current.includes("/")) {
-    providerName = current.split("/")[0];
-  } else {
+  let providerName = config.value.agent_defaults?.provider || "";
+  
+  if (!providerName) {
     for (const provider of config.value.providers || []) {
       if (provider.has_key && provider.enabled) {
         providerName = provider.name;
@@ -1790,7 +1586,10 @@ const currentProviderName = computed(() => {
       }
     }
   }
-  return getProviderDisplayName(providerName) || providerName || "未设置";
+  
+  if (!providerName) return "未设置";
+  const provider = config.value.providers?.find((p: any) => p.name === providerName);
+  return provider?.display_name || providerName;
 });
 
 const enabledChannelsCount = computed(() => {
@@ -1820,33 +1619,7 @@ const getModelsForProvider = (providerName: string) => {
   return provider?.models || [];
 };
 
-const getModelDisplayName = (modelId: string) => {
-  if (!modelId) return "";
-  if (modelId.includes("/")) {
-    const [provider, model] = modelId.split("/", 1);
-    const providerData = config.value.providers?.find(
-      (p: any) => p.name === provider,
-    );
-    if (providerData?.models) {
-      const modelData = providerData.models.find(
-        (m: any) => m.model_id === model,
-      );
-      return modelData?.display_name || model;
-    }
-    return model;
-  }
-  for (const provider of config.value.providers || []) {
-    if (provider?.models) {
-      const modelData = provider.models.find(
-        (m: any) => m.model_id === modelId,
-      );
-      if (modelData) {
-        return modelData.display_name || modelId;
-      }
-    }
-  }
-  return modelId;
-};
+// 该函数已被删除，如有需要请使用 getProviderDisplayName 替代
 
 const getProviderDisplayName = (providerName: string) => {
   if (!providerName) return "";
@@ -1857,8 +1630,14 @@ const getProviderDisplayName = (providerName: string) => {
 };
 
 const isCurrentProvider = (providerName: string) => {
-  const current = config.value.model?.current || "";
-  return current.includes("/") && current.split("/")[0] === providerName;
+  const currentModel = config.value.model?.current || "";
+  const currentProvider = config.value.agent_defaults?.provider || "";
+  
+  if (currentModel.includes("/")) {
+    return currentModel.split("/")[0] === providerName;
+  }
+  
+  return currentProvider === providerName;
 };
 
 const isCurrentModel = (providerName: string, modelId: string) => {
@@ -2666,43 +2445,319 @@ onMounted(() => {
   padding: 1rem;
 }
 
-.service-overview-card,
-.token-stats-card {
-  background-color: var(--color-bg-surface);
+.overview-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.service-status-card {
+  background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  margin-bottom: 1rem;
-  overflow: hidden;
+  padding: 1.5rem;
+  height: 100%;
 }
 
-.overview-header {
+.status-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  border-bottom: 1px solid var(--color-border);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
 }
 
-.overview-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin: 0;
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: pulse 2s infinite;
 }
 
-.overview-main {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  padding: 1.5rem;
+.status-indicator.online {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
 }
 
-.overview-stat {
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.status-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-success);
+}
+
+.current-model-section {
+  margin-bottom: 1.5rem;
+}
+
+.model-display {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background-color: var(--color-bg-muted);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-bg-muted) 100%);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--color-primary);
+}
+
+.model-info-cards {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.model-info-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary-light);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.info-card-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  svg {
+    width: 22px;
+    height: 22px;
+    color: white;
+  }
+
+  &.provider {
+    background: var(--color-success);
+  }
+}
+
+.info-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.info-card-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.info-card-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &.provider {
+    color: var(--color-success);
+  }
+}
+
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.module-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &.active {
+    background: var(--color-success-light);
+    border-color: var(--color-success);
+
+    .chip-icon {
+      color: var(--color-success);
+    }
+
+    .chip-status {
+      color: var(--color-success);
+    }
+  }
+}
+
+.chip-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.chip-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.chip-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.token-overview-card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  height: 100%;
+}
+
+.token-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.token-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.period-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--color-bg-muted);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+}
+
+.period-tab {
+  padding: 0.375rem 0.75rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &.active {
+    background: var(--color-primary);
+    color: white;
+  }
+
+  &:hover:not(.active) {
+    background: var(--color-bg-surface);
+  }
+}
+
+.token-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.metric-card {
+  padding: 1.25rem 1rem;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary-light);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &.primary {
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-bg-surface) 100%);
+    border: 2px solid var(--color-primary);
+
+    .metric-number {
+      color: var(--color-primary);
+    }
+    
+    .metric-title {
+      color: var(--color-primary);
+      font-weight: 500;
+    }
+  }
+}
+
+.metric-number {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 0.375rem;
+  line-height: 1.2;
+
+  &.cost {
+    color: var(--color-warning);
+  }
+}
+
+.metric-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.model-usage-section {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.model-usage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.model-usage-card {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   transition: all var(--transition-fast);
 
@@ -2712,171 +2767,116 @@ onMounted(() => {
   }
 }
 
-.overview-icon {
-  width: 48px;
-  height: 48px;
-  padding: 0.75rem;
-  color: var(--color-primary);
-  background-color: var(--color-primary-light);
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.overview-info {
+.usage-left {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-}
-
-.overview-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.overview-value {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.overview-modules {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  padding: 1rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.module-status-item {
-  display: flex;
-  align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem;
-  border-radius: var(--radius-md);
-  background-color: var(--color-bg-muted);
+  min-width: 140px;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--color-border);
+}
+
+.usage-model-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+.usage-provider-tag {
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.usage-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   min-width: 0;
 }
 
-.module-status-item > * {
-  flex-shrink: 0;
-}
-
-.module-label {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.module-value {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.module-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--color-text-secondary);
-}
-
-.module-label {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-.module-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-left: auto;
-
-  &.text-success {
-    color: var(--color-success);
-  }
-
-  &.text-muted {
-    color: var(--color-text-muted);
-  }
-}
-
-.period-selector {
+.usage-stats-row {
   display: flex;
-  gap: 0.25rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.period-btn {
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-surface);
-  border-radius: var(--radius-sm);
+.usage-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 60px;
+}
+
+.stat-label {
   font-size: 0.75rem;
-  cursor: pointer;
+  color: var(--color-text-secondary);
+}
 
-  &.active {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-  }
+.stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
 
-  &:hover:not(.active) {
-    background: var(--color-bg-muted);
+  &.cost {
+    color: var(--color-warning);
   }
 }
 
-.token-stats-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  padding: 1.25rem;
-}
-
-.token-stat {
+.usage-progress {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 1rem 1.25rem;
-  background: linear-gradient(
-    135deg,
-    var(--color-bg-muted) 0%,
-    var(--color-bg-surface) 100%
-  );
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  transition: all var(--transition-fast);
+  gap: 0.75rem;
+}
 
-  &:hover {
-    border-color: var(--color-primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
+.progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--color-bg-muted);
+  border-radius: 4px;
+  overflow: hidden;
+}
 
-  &.token-stat-primary {
-    grid-column: span 1;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary-light) 0%,
-      var(--color-bg-surface) 100%
-    );
-    border-color: var(--color-primary);
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
 
-    .token-stat-icon {
-      background: var(--color-primary);
-      color: white;
-    }
+.progress-percent {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  min-width: 36px;
+  text-align: right;
+}
 
-    .token-stat-value {
-      color: var(--color-primary);
-    }
-  }
+.usage-quota {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
 
-  &.token-stat-cost {
-    .token-stat-icon {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    }
+.quota-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
 
-    .token-stat-value {
-      color: #10b981;
-    }
-  }
+.quota-value {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 .token-stat-icon {
@@ -2969,7 +2969,7 @@ onMounted(() => {
 }
 
 .model-stat-provider {
-  font-size: 0.6875rem;
+  font-size: 0.78rem;
   padding: 0.125rem 0.5rem;
   background: var(--color-primary-light);
   color: var(--color-primary);
@@ -3016,7 +3016,7 @@ onMounted(() => {
 }
 
 .metric-label {
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   line-height: 1;
 }
@@ -3043,7 +3043,7 @@ onMounted(() => {
 }
 
 .progress-label {
-  font-size: 0.6875rem;
+  font-size: 0.78rem;
   color: var(--color-text-secondary);
   font-weight: 500;
   min-width: 32px;
@@ -3116,7 +3116,7 @@ onMounted(() => {
 }
 
 .expand-icon {
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   transition: transform var(--transition-fast);
 }
@@ -3659,7 +3659,20 @@ input:checked + .slider:before {
 
 .model-detail {
   font-size: 0.75rem;
-  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+
+  .model-provider {
+    color: var(--color-primary);
+    font-weight: 500;
+    font-size: 0.8125rem;
+  }
+
+  .model-name {
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+  }
 }
 
 .save-result {

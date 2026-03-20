@@ -366,12 +366,14 @@ class AgentLoop:
         self,
         initial_messages: list[dict],
         on_progress: Callable[..., Awaitable[None]] | None = None,
-    ) -> tuple[str | None, list[str], list[dict]]:
-        """Run the agent iteration loop. Returns (final_content, tools_used, messages)."""
+    ) -> tuple[str | None, list[str], list[dict], dict[str, int | str]]:
+        """Run the agent iteration loop. Returns (final_content, tools_used, messages, usage)."""
         messages = initial_messages
         iteration = 0
         final_content = None
         tools_used: list[str] = []
+        total_usage: dict[str, int | str] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        used_model = self.model
 
         while iteration < self.max_iterations:
             iteration += 1
@@ -383,6 +385,13 @@ class AgentLoop:
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
+            
+            if response.usage:
+                total_usage["prompt_tokens"] += response.usage.get("prompt_tokens", 0)
+                total_usage["completion_tokens"] += response.usage.get("completion_tokens", 0)
+                total_usage["total_tokens"] += response.usage.get("total_tokens", 0)
+            if response.model:
+                used_model = response.model
 
             if response.has_tool_calls:
                 if on_progress:
@@ -435,7 +444,8 @@ class AgentLoop:
                 "without completing the task. You can try breaking the task into smaller steps."
             )
 
-        return final_content, tools_used, messages
+        total_usage["model"] = used_model
+        return final_content, tools_used, messages, total_usage
 
     @property
     def web_search_api_key(self) -> str:
@@ -579,9 +589,15 @@ class AgentLoop:
                 history=history,
                 current_message=msg.content, channel=channel, chat_id=chat_id,
             )
-            final_content, _, all_msgs = await self._run_agent_loop(messages)
+            final_content, _, all_msgs, usage = await self._run_agent_loop(messages)
             self._save_turn(session, all_msgs, 1 + len(history), attachments=[{"path": p} for p in msg.media] if msg.media else None, user_original_content=msg.content)
-            self.sessions.save(session)
+            self.sessions.add_token_usage(
+                session.key,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                model=usage.get("model", self.model)
+            )
             return OutboundMessage(channel=channel, chat_id=chat_id,
                                   content=final_content or "Background task completed.")
 
@@ -667,7 +683,7 @@ class AgentLoop:
                 channel=msg.channel, chat_id=msg.chat_id, content=content, metadata=meta,
             ))
 
-        final_content, _, all_msgs = await self._run_agent_loop(
+        final_content, _, all_msgs, usage = await self._run_agent_loop(
             initial_messages, on_progress=on_progress or _bus_progress,
         )
 
@@ -678,7 +694,13 @@ class AgentLoop:
         logger.info("Response to {}:{}: {}", msg.channel, msg.sender_id, preview)
 
         self._save_turn(session, all_msgs, 1 + len(history), attachments=[{"path": p} for p in msg.media] if msg.media else None, user_original_content=msg.content)
-        self.sessions.save(session)
+        self.sessions.add_token_usage(
+            session.key,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            model=usage.get("model", self.model)
+        )
         
         self.context.cleanup_tool_cache()
 
@@ -990,17 +1012,13 @@ class AgentLoop:
             
             self._save_turn(session, messages, 1 + len(history), attachments=[{"path": p} for p in media] if media else None, user_original_content=content)
             logger.info(f"[Stream] Token stats: prompt={total_prompt_tokens}, completion={total_completion_tokens}, total={total_tokens}, model={used_model}")
-            if total_tokens > 0:
-                session.total_prompt_tokens += total_prompt_tokens
-                session.total_completion_tokens += total_completion_tokens
-                session.total_tokens += total_tokens
-                session.request_count += 1
-                session.used_model = used_model
-            else:
-                session.request_count += 1
-                if used_model:
-                    session.used_model = used_model
-            self.sessions.save(session)
+            self.sessions.add_token_usage(
+                session.key,
+                prompt_tokens=total_prompt_tokens,
+                completion_tokens=total_completion_tokens,
+                total_tokens=total_tokens,
+                model=used_model
+            )
             
             if on_chunk:
                 await on_chunk(StreamChunk(type="done", content=final_content or ""))

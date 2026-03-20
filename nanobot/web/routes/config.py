@@ -513,7 +513,18 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
     save_config(config)
     
     config_path = get_config_path()
-    request.app.state.config = load_config(config_path)
+    new_config = load_config(config_path)
+    request.app.state.config = new_config
+    
+    # Recreate provider with new model configuration
+    # This ensures the provider uses the correct API key/base for the new model
+    agent = request.app.state.agent
+    if agent:
+        from nanobot.cli.commands import _make_provider
+        new_provider = _make_provider(new_config)
+        agent.provider = new_provider
+        agent._model = new_config.agents.defaults.model
+        logger.info(f"Provider recreated for model: {update.model}")
 
     return {
         "status": "updated",
@@ -554,13 +565,23 @@ async def set_provider_api_key(
     save_config(config)
     
     config_path = get_config_path()
-    request.app.state.config = load_config(config_path)
+    new_config = load_config(config_path)
+    request.app.state.config = new_config
+    
+    # Recreate provider with new API key/base
+    # This ensures the provider uses the updated credentials
+    agent = request.app.state.agent
+    if agent:
+        from nanobot.cli.commands import _make_provider
+        new_provider = _make_provider(new_config)
+        agent.provider = new_provider
+        logger.info(f"Provider recreated after updating API key for: {provider_name}")
 
     return {
         "status": "updated",
         "provider": provider_name,
         "has_key": bool(update.api_key),
-        "message": "API key updated. Restart may be required for changes to take effect.",
+        "message": "API key updated successfully.",
     }
 
 

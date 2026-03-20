@@ -387,7 +387,7 @@ async def index_notes(
     """Index notes in a directory.
 
     Args:
-        directory: Directory to index.
+        directory: Directory to index. If "notes" or not found, indexes all configured note directories.
         force: Force reindex all files.
 
     Returns:
@@ -415,12 +415,20 @@ async def index_notes(
             detail="Knowledge index is disabled. Please set tools.knowledge.index.enabled = true in config."
         )
 
-    target_dir = workspace / directory
-    if not target_dir.exists():
-        raise HTTPException(status_code=404, detail=f"Directory not found: {directory}")
-
-    if not target_dir.is_dir():
-        raise HTTPException(status_code=400, detail=f"Not a directory: {directory}")
+    target_dirs = []
+    if directory == "notes" or not (workspace / directory).exists():
+        notes_dirs = getattr(knowledge_config, 'notes_dirs', NOTE_DIRS) if knowledge_config else NOTE_DIRS
+        for dir_name in notes_dirs:
+            dir_path = workspace / dir_name
+            if dir_path.exists() and dir_path.is_dir():
+                target_dirs.append(dir_path)
+        if not target_dirs:
+            raise HTTPException(status_code=404, detail="No note directories found in workspace")
+    else:
+        target_dir = workspace / directory
+        if not target_dir.is_dir():
+            raise HTTPException(status_code=400, detail=f"Not a directory: {directory}")
+        target_dirs = [target_dir]
 
     persist_dir = Path(index_config.persist_dir).expanduser()
     persist_dir.mkdir(parents=True, exist_ok=True)
@@ -444,15 +452,16 @@ async def index_notes(
         indexer = IncrementalIndexer(persist_dir)
 
         all_chunks = []
-        md_files = list(target_dir.rglob("*.md"))
         total_files = 0
 
-        for md_file in md_files:
-            if force or indexer.needs_reindex(md_file):
-                chunks = processor.process_markdown(md_file)
-                all_chunks.extend(chunks)
-                indexer.mark_indexed(md_file)
-                total_files += 1
+        for target_dir in target_dirs:
+            md_files = list(target_dir.rglob("*.md"))
+            for md_file in md_files:
+                if force or indexer.needs_reindex(md_file):
+                    chunks = processor.process_markdown(md_file)
+                    all_chunks.extend(chunks)
+                    indexer.mark_indexed(md_file)
+                    total_files += 1
 
         if all_chunks:
             result = retriever.index_documents(all_chunks)

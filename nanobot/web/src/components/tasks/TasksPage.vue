@@ -1310,7 +1310,7 @@ const closeAgentLog = (taskId: string) => {
       background: #ef4444;
       color: #fff;
       border-radius: 9px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
     }
   }

@@ -229,7 +229,7 @@ export const useChatStore = defineStore("chat", () => {
         }
         break;
       case "error":
-        handleError(data.message);
+        handleError(data.content || data.message);
         break;
       default:
         if (data.content) {
