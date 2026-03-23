@@ -100,43 +100,20 @@ class LiteLLMProvider(LLMProvider):
     def _resolve_model(self, model: str) -> str:
         """Resolve model name.
 
-        For gateway mode, returns the model without prefix and sets _gateway_provider.
-        For standard mode, adds provider prefix if needed.
+        For gateway mode, returns the model and sets _gateway_provider for routing.
+        For standard mode, adds litellm_prefix if needed (e.g., zai/glm-4-flash).
         """
         if self._gateway:
-            # Gateway mode: strip prefix if needed, return model as-is
-            if self._gateway.strip_model_prefix and "/" in model:
-                model = model.split("/")[-1]
             self._gateway_provider = self._gateway.litellm_prefix
             return model
 
-        # Standard mode: auto-prefix for known providers
-        # Skip if model already has multi-level format (e.g., "Pro/deepseek-ai/DeepSeek-V3.2")
-        if model.count("/") >= 2:
-            self._gateway_provider = None
-            return model
-
+        self._gateway_provider = None
         spec = find_by_model(model)
         if spec and spec.litellm_prefix:
-            model = self._canonicalize_explicit_prefix(model, spec.name, spec.litellm_prefix)
-            if not any(model.startswith(s) for s in spec.skip_prefixes):
+            if not model.startswith(f"{spec.litellm_prefix}/"):
                 model = f"{spec.litellm_prefix}/{model}"
-            self._gateway_provider = None
-        else:
-            self._gateway_provider = None
-
         return model
 
-    @staticmethod
-    def _canonicalize_explicit_prefix(model: str, spec_name: str, canonical_prefix: str) -> str:
-        """Normalize explicit provider prefixes like `github-copilot/...`."""
-        if "/" not in model:
-            return model
-        prefix, remainder = model.split("/", 1)
-        if prefix.lower().replace("-", "_") != spec_name:
-            return model
-        return f"{canonical_prefix}/{remainder}"
-    
     def _supports_cache_control(self, model: str) -> bool:
         """Return True when the provider supports cache_control on content blocks."""
         if self._gateway is not None:

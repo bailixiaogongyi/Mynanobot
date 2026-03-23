@@ -489,7 +489,8 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
 
     config = _get_config(request)
 
-    config.agents.defaults.model = update.model
+    if update.model:
+        config.agents.defaults.model = update.model
     if update.provider:
         config.agents.defaults.provider = update.provider
     if update.enable_reasoning is not None:
@@ -503,9 +504,10 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
     }
     recent_models = config.agents.recent_models
     # Remove if already exists
-    recent_models = [m for m in recent_models if m.get("model") != update.model]
-    # Add to front
-    recent_models.insert(0, current_model_info)
+    if update.model:
+        recent_models = [m for m in recent_models if m.get("model") != update.model]
+        # Add to front
+        recent_models.insert(0, current_model_info)
     # Keep only last 5
     config.agents.recent_models = recent_models[:5]
 
@@ -524,6 +526,7 @@ async def set_model(update: ModelUpdate, request: Request) -> dict[str, Any]:
         new_provider = _make_provider(new_config)
         agent.provider = new_provider
         agent._model = new_config.agents.defaults.model
+        agent.config = new_config  # 更新 agent 的 config 引用
         logger.info(f"Provider recreated for model: {update.model}")
 
     return {

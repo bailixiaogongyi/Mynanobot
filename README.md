@@ -1,5 +1,7 @@
 # AiMate 系统文档
 
+> **当前版本**: 0.1.4.post3
+
 ## 目录
 
 - [系统概述](#系统概述)
@@ -20,13 +22,12 @@
 - [初始化检查清单](#初始化检查清单)
 - [配置说明](#配置说明)
 - [国内环境适配](#国内环境适配)
-  - [博查搜索](#博查搜索-web-search)
-  - [心知天气](#心知天气-weather)
-  - [知识索引模型下载](#知识索引模型下载)
 - [部署指南](#部署指南)
 - [Windows 后台服务](#windows-后台服务)
 - [注意事项](#注意事项)
 - [故障排除](#故障排除)
+- [安全说明](#安全说明)
+- [附录](#附录)
 
 ---
 
@@ -39,16 +40,18 @@
 | 特性                    | 描述                                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | 🪶 **超轻量**           | 核心代码 ~4,000 行，启动快速，资源占用低                                                                |
-| 🔌 **多渠道**           | 支持 Telegram、Discord、WhatsApp、飞书、Slack、QQ、邮件等                                               |
+| 🔌 **多渠道**           | 支持 Telegram、Discord、WhatsApp、飞书、Slack、QQ、钉钉、邮件等                                         |
 | 🤖 **多模型**           | 支持 OpenRouter、Anthropic、OpenAI、DeepSeek、Gemini 等 20+ 提供商，含 SCNet、Qiniu、Baishan 国内提供商 |
 | 🛠️ **工具调用**         | 内置文件操作、Shell 执行、网络搜索、天气查询、MCP 协议、浏览器脚本执行器等工具                          |
 | 🧠 **记忆系统**         | 双层记忆架构（长期记忆 + 历史日志）                                                                     |
-| 📚 **知识检索**         | 混合检索（BM25 + 向量），支持笔记索引                                                                   |
+| 📚 **知识检索**         | 混合检索（BM25 + 向量 + 知识图谱），支持笔记索引                                                        |
 | ⏰ **定时任务**         | Cron 表达式和间隔调度                                                                                   |
 | 🌐 **Web UI**           | FastAPI + Vue 3 现代化界面，支持配置管理                                                                |
 | 🔐 **安全认证**         | 固定密码 + 设备指纹白名单，保护 Web UI 访问安全                                                         |
 | 🇨🇳 **国内适配**         | 博查搜索、心知天气，完美支持国内网络环境                                                                |
 | 🖥️ **浏览器脚本执行器** | 用户定义JSON脚本，AI调度执行                                                                            |
+| 🤖 **多Agent代理**      | 支持角色分配、并行执行、工作空间隔离的子代理系统                                                        |
+| 🎨 **图像生成**         | 支持AI图像生成功能，可配置不同模型                                                                      |
 
 ---
 
@@ -94,6 +97,7 @@
                        │ Weather     │
                        │ Browser     │
                        │ MCP Tools   │
+                       │ Spawn       │
                        └─────────────┘
 ```
 
@@ -117,7 +121,7 @@
 | `context.py`          | 上下文构建，Prompt 模板管理      |
 | `memory.py`           | 记忆存储和知识管理               |
 | `skills.py`           | 技能加载器                       |
-| `subagent_manager.py` | 后台任务执行器（v2）             |
+| `subagent_manager.py` | 后台任务执行器（多Agent代理）    |
 | `mem_indexer.py`      | 记忆索引器                       |
 | `mem_layer.py`        | 记忆层级管理                     |
 | `tools/`              | 内置工具实现                     |
@@ -437,13 +441,16 @@ playwright install-deps chromium
 
 ### 5. Knowledge 模块 (`nanobot/knowledge/`)
 
-知识检索系统，支持混合检索。
+知识检索系统，支持混合检索和知识图谱。
 
 ```
 HybridRetriever
     ├── BM25Retriever (关键词检索)
-    ├── VectorStore (语义检索)
+    ├── VectorStore (语义检索 - ChromaDB)
     ├── GraphStore (知识图谱 - 可选)
+    ├── EntityExtractor (实体提取)
+    │   ├── PatternExtractor (规则提取)
+    │   └── LLMExtractor (LLM提取 - 可选)
     └── RRF Fusion (倒数排名融合)
 ```
 
@@ -461,7 +468,10 @@ HybridRetriever
         "chunk_overlap": 50,
         "use_bm25": true,
         "use_vector": true,
-        "use_graph": false,
+        "use_graph": true,
+        "use_llm_extract": true,
+        "llm_extract_batch": 10,
+        "llm_extract_threshold": 0.7,
         "rrf_k": 60
       },
       "search": {
@@ -497,6 +507,21 @@ HybridRetriever
 }
 ```
 
+**图像生成配置**（可选）:
+
+```json
+{
+  "tools": {
+    "image_generation": {
+      "enabled": true,
+      "api_key": "your-api-key",
+      "api_base": "https://api.example.com/v1",
+      "model": "wan21-turbo"
+    }
+  }
+}
+```
+
 **配置项说明**:
 
 | 配置项                  | 说明                 | 默认值                   |
@@ -508,8 +533,8 @@ HybridRetriever
 | `index.chunk_overlap`   | 分块重叠字符数       | 50                       |
 | `index.use_bm25`        | 启用 BM25 关键词检索 | `true`                   |
 | `index.use_vector`      | 启用向量语义检索     | `true`                   |
-| `index.use_graph`       | 启用知识图谱检索     | `false`                  |
-| `index.use_llm_extract` | 启用 LLM 实体提取    | `false`                  |
+| `index.use_graph`       | 启用知识图谱检索     | `true`                   |
+| `index.use_llm_extract` | 启用 LLM 实体提取    | `true`                   |
 | `search.default_top_k`  | 默认返回结果数       | 5                        |
 | `search.cache_enabled`  | 启用搜索缓存         | `true`                   |
 | `auto_index_notes`      | 自动索引笔记目录     | `true`                   |
@@ -637,7 +662,7 @@ MessageBus
 }
 ```
 
-### 7. Web UI 安全认证
+### 12. Web UI 安全认证
 
 Web UI 支持基于固定密码 + 设备指纹白名单的安全认证机制。
 
@@ -743,22 +768,22 @@ It will NOT be shown again.
 ```bash
 git clone https://github.com/HKUDS/nanobot.git
 cd nanobot
-pip install -e .
+pip install -e ".[web-ui]"
 
-或者使用：
-python3 -m pip install -e .
+# 或者使用：
+python3 -m pip install -e ".[web-ui]"
 ```
 
 **方式二：使用 uv 安装（推荐生产使用）**
 
 ```bash
-uv tool install nanobot-ai
+uv tool install "nanobot-ai[web-ui]"
 ```
 
 **方式三：从 PyPI 安装**
 
 ```bash
-pip install nanobot-ai
+pip install "nanobot-ai[web-ui]"
 ```
 
 ---
@@ -792,13 +817,10 @@ python3 -m venv .venv
 # 3. 激活虚拟环境
 source .venv/bin/activate
 
-# 4. 安装（可编辑模式）
-python3 -m pip install -e .
+# 4. 安装（可编辑模式，包含 Web UI 依赖）
+python3 -m pip install -e ".[web-ui]"
 
-# 5. 安装 Web UI 依赖（必需）
-pip install fastapi uvicorn python-multipart
-
-# 6. 验证安装
+# 5. 验证安装
 nanobot --version
 ```
 
@@ -815,13 +837,10 @@ python -m venv .venv
 # 3. 激活虚拟环境
 .\.venv\Scripts\Activate.ps1
 
-# 4. 安装（可编辑模式）
-pip install -e .
+# 4. 安装（可编辑模式，包含 Web UI 依赖）
+pip install -e ".[web-ui]"
 
-# 5. 安装 Web UI 依赖（必需）
-pip install fastapi uvicorn python-multipart
-
-# 6. 验证安装
+# 5. 验证安装
 nanobot --version
 ```
 
@@ -833,8 +852,8 @@ nanobot --version
 # 1. 安装 uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. 安装 nanobot
-uv tool install nanobot-ai
+# 2. 安装 nanobot（包含 Web UI）
+uv tool install "nanobot-ai[web-ui]"
 
 # 3. 验证安装
 nanobot --version
@@ -846,8 +865,8 @@ nanobot --version
 # 1. 安装 uv
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# 2. 安装 nanobot
-uv tool install nanobot-ai
+# 2. 安装 nanobot（包含 Web UI）
+uv tool install "nanobot-ai[web-ui]"
 
 # 3. 验证安装
 nanobot --version
@@ -856,22 +875,22 @@ nanobot --version
 #### 方式三：从 PyPI 安装
 
 ```bash
-pip install nanobot-ai
+pip install "nanobot-ai[web-ui]"
 ```
 
 **可选依赖**：
 
 | 依赖组      | 功能                 | 安装命令                            |
 | ----------- | -------------------- | ----------------------------------- |
+| `web-ui`    | Web UI 界面（推荐）  | `pip install nanobot-ai[web-ui]`    |
 | `knowledge` | 知识索引（向量检索） | `pip install nanobot-ai[knowledge]` |
 | `docx`      | Word 文档处理        | `pip install nanobot-ai[docx]`      |
 | `pdf`       | PDF 文档处理         | `pip install nanobot-ai[pdf]`       |
 | `excel`     | Excel 表格处理       | `pip install nanobot-ai[excel]`     |
 | `pptx`      | PowerPoint 处理      | `pip install nanobot-ai[pptx]`      |
 | `ocr`       | OCR 文字识别         | `pip install nanobot-ai[ocr]`       |
-| `web-ui`    | Web UI 界面          | `pip install nanobot-ai[web-ui]`    |
 
-可以组合安装：`pip install nanobot-ai[pdf,excel,pptx,ocr]`
+可以组合安装：`pip install "nanobot-ai[web-ui,pdf,excel,pptx,ocr]"`
 
 ---
 
@@ -1119,7 +1138,10 @@ uv tool upgrade nanobot-ai
 source .venv/bin/activate  # Linux
 .\.venv\Scripts\Activate.ps1  # Windows
 
-# 安装依赖
+# 安装 Web UI 依赖
+pip install "nanobot-ai[web-ui]"
+
+# 或者单独安装
 pip install fastapi uvicorn python-multipart
 
 # 重启服务
@@ -1242,8 +1264,7 @@ netstat -an | findstr 8080
 
 - [ ] Python >= 3.11 已安装 (`python --version`)
 - [ ] 虚拟环境已创建并激活
-- [ ] nanobot 已安装 (`pip install -e .` 或 `uv tool install nanobot-ai`)
-- [ ] Web UI 依赖已安装 (`pip install fastapi uvicorn python-multipart`)
+- [ ] nanobot 已安装 (`pip install -e ".[web-ui]"` 或 `uv tool install "nanobot-ai[web-ui]"`)
 - [ ] `nanobot onboard` 已执行
 - [ ] 配置文件已创建 (`~/.nanobot/config.json`)
 - [ ] 至少一个 Provider API Key 已配置
@@ -1277,181 +1298,6 @@ playwright install chromium
 
 ---
 
-Web UI 默认配置：
-
-```json
-{
-  "gateway": {
-    "webUi": {
-      "enabled": true,
-      "host": "0.0.0.0",
-      "port": 8080,
-      "auth": {
-        "enabled": true,
-        "password": "",
-        "whitelistFile": "~/.nanobot/whitelist.json"
-      }
-    }
-  }
-}
-```
-
-**重要配置说明**：
-
-| 配置项          | 说明                              |
-| --------------- | --------------------------------- |
-| `host`          | 必须为 `0.0.0.0`，不能使用公网 IP |
-| `auth.enabled`  | 默认不启用，需手动开启            |
-| `auth.password` | 为空时，启动时自动生成 24 位密码  |
-
-**首次启动时**，日志会显示自动生成的密码：
-
-```
-============================================================
-WEB UI AUTHENTICATION PASSWORD GENERATED
-Password: xK9#mP2$vL7@nQ4!wR8&yT3
-Please save this password securely!
-It will NOT be shown again.
-============================================================
-```
-
-**关闭认证**（不推荐）：
-
-```json
-{
-  "gateway": {
-    "webUi": {
-      "auth": {
-        "enabled": false
-      }
-    }
-  }
-}
-```
-
-### 最小配置示例
-
-```json
-{
-  "providers": {
-    "deepseek": {
-      "api_key": "sk-xxx"
-    }
-  },
-  "tools": {
-    "web": {
-      "search": {
-        "api_key": "你的博查搜索API密钥"
-      }
-    },
-    "weather": {
-      "weather": {
-        "api_key": "你的心知天气API密钥"
-      }
-    }
-  }
-}
-```
-
-### 启动使用
-
-```bash
-# 命令行聊天
-nanobot agent
-
-# 启动网关（连接聊天渠道）
-nanobot gateway
-
-# 查看状态
-nanobot status
-```
-
----
-
-## 启动流程
-
-### CLI 模式启动流程
-
-```
-nanobot agent
-    │
-    ▼
-┌─────────────────────────────────────┐
-│ 1. 加载配置 (load_config)            │
-│    - 读取 ~/.nanobot/config.json    │
-│    - 验证配置有效性                   │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 2. 创建 LLM Provider                 │
-│    - 根据模型匹配提供商               │
-│    - 设置 API Key 和 Base URL       │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 3. 初始化 AgentLoop                  │
-│    - 创建 MessageBus                │
-│    - 注册工具 (ToolRegistry)         │
-│    - 初始化会话管理器                 │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 4. 进入交互循环                       │
-│    - 读取用户输入                     │
-│    - 发布到消息总线                   │
-│    - 等待响应并显示                   │
-└─────────────────────────────────────┘
-```
-
-### Gateway 模式启动流程
-
-```
-nanobot gateway
-    │
-    ▼
-┌─────────────────────────────────────┐
-│ 1. 加载配置和创建 Provider            │
-│    (同 CLI 模式)                      │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 2. 初始化服务组件                     │
-│    - CronService (定时任务)          │
-│    - HeartbeatService (心跳)         │
-│    - SessionManager (会话)           │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 3. 初始化渠道管理器                   │
-│    - 根据配置启用渠道                 │
-│    - Telegram/Discord/WhatsApp 等   │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 4. 启动 Web UI (可选)                │
-│    - FastAPI 服务                    │
-│    - 端口 8080                       │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│ 5. 并发运行所有服务                   │
-│    - AgentLoop (消息处理)            │
-│    - ChannelManager (渠道连接)       │
-│    - CronService (定时任务)          │
-│    - HeartbeatService (心跳)         │
-│    - WebServer (Web UI)             │
-└─────────────────────────────────────┘
-```
-
----
-
 ## 配置说明
 
 ### 配置文件位置
@@ -1474,8 +1320,18 @@ nanobot gateway
       "max_tokens": 8192,
       "temperature": 0.1,
       "max_tool_iterations": 30,
-      "memory_window": 50
-    }
+      "memory_window": 50,
+      "enable_reasoning": true
+    },
+    "subagent": {
+      "enabled": true,
+      "version": "v2",
+      "max_concurrent": 5,
+      "default_timeout": 600,
+      "workspace_isolation": true,
+      "progress_report_interval": 10
+    },
+    "roles": {}
   },
   "providers": {
     "deepseek": {
@@ -1523,8 +1379,24 @@ nanobot gateway
     "knowledge": {
       "index": {
         "enabled": true,
-        "embedding_model": "BAAI/bge-small-zh-v1.5"
-      }
+        "embedding_model": "BAAI/bge-small-zh-v1.5",
+        "persist_dir": "~/.nanobot/knowledge",
+        "chunk_size": 512,
+        "chunk_overlap": 50,
+        "use_bm25": true,
+        "use_vector": true,
+        "use_graph": false,
+        "rrf_k": 60
+      },
+      "search": {
+        "default_top_k": 5,
+        "cache_enabled": true,
+        "cache_max_size": 100,
+        "cache_ttl_seconds": 3600,
+        "default_search_type": "auto"
+      },
+      "auto_index_notes": true,
+      "notes_dirs": ["daily", "projects", "personal", "topics", "pending"]
     }
   },
   "channels": {
@@ -1540,6 +1412,10 @@ nanobot gateway
       "app_id": "",
       "app_secret": ""
     }
+  },
+  "upload": {
+    "enabled": true,
+    "max_file_size": 20971520
   }
 }
 ```
@@ -1764,9 +1640,9 @@ tar -xzvf /tmp/huggingface_cache.tar.gz -C ~/
 #### 快速部署步骤
 
 ```bash
-# 1. 克隆项目，代码修改，不能克隆
-# git clone https://github.com/HKUDS/nanobot.git
-# cd nanobot
+# 1. 克隆项目
+git clone https://github.com/HKUDS/nanobot.git
+cd nanobot
 
 # 2. 构建镜像
 docker compose build
@@ -2222,563 +2098,6 @@ chmod 600 ~/.nanobot/config.json
 
 ---
 
-## 系统运行机制详解
-
-### 核心启动流程
-
-```
-nanobot gateway
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. 加载配置 (config/loader.py)                                       │
-│    - 读取 ~/.nanobot/config.json                                    │
-│    - 解析环境变量覆盖                                                │
-│    - 验证配置有效性                                                  │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. 创建 LLM Provider (providers/factory.py)                         │
-│    - 根据模型前缀匹配提供商                                          │
-│    - 设置 API Key 和 Base URL                                       │
-│    - 初始化 LiteLLM 或自定义 Provider                               │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. 初始化 AgentLoop (agent/loop.py)                                  │
-│    ├── 创建 MessageBus (消息路由)                                    │
-│    ├── 创建 SessionManager (会话管理)                                │
-│    ├── 初始化工具注册表 (ToolRegistry)                               │
-│    │   - 文件操作: read_file, write_file, edit_file, list_dir      │
-│    │   - Shell执行: exec                                            │
-│    │   - 网络工具: web_search, web_fetch                            │
-│    │   - 天气查询: weather, weather_forecast                        │
-│    │   - 文档处理: docx_*, pdf_*, excel_*, pptx_*                   │
-│    │   - 子Agent: spawn                                             │
-│    │   - 文件返回: return_file                                      │
-│    ├── 初始化子Agent系统                                             │
-│    │   - 加载默认角色 (nanobot/config/roles.yaml)                   │
-│    │   - 加载用户角色 (workspace/config/roles.yaml)                 │
-│    │   - 创建 TaskManager, RoleManager, SubagentManager             │
-│    └── 连接 MCP 服务器 (可选)                                        │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 4. 启动 Web UI (web/server.py)                                       │
-│    ├── 创建 FastAPI 应用                                             │
-│    ├── 配置认证中间件                                                │
-│    ├── 注册 API 路由                                                 │
-│    │   - /api/auth/*   认证接口                                      │
-│    │   - /api/chat/*   聊天接口 (WebSocket)                          │
-│    │   - /api/agents/* 子Agent管理                                   │
-│    │   - /api/notes/*  笔记管理                                      │
-│    │   - /api/skills/* 技能管理                                      │
-│    │   - /api/upload/* 文件上传                                      │
-│    └── 挂载静态文件                                                  │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 5. 并发运行服务                                                      │
-│    ├── AgentLoop.run() - 消息处理主循环                              │
-│    ├── WebServer - FastAPI 服务                                      │
-│    ├── CronService - 定时任务 (可选)                                 │
-│    └── HeartbeatService - 心跳服务 (可选)                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 消息处理流程
-
-```
-用户发送消息
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ WebSocket 接收 (routes/chat.py)                                      │
-│ - 解析消息内容                                                       │
-│ - 处理附件文件                                                       │
-│ - 构建 session_key = "web:{chat_id}"                                │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ AgentLoop.process_stream() (loop.py)                                 │
-│                                                                      │
-│ 1. 获取/创建会话                                                     │
-│    session = sessions.get_or_create(session_key)                    │
-│                                                                      │
-│ 2. 构建上下文                                                        │
-│    history = session.get_history(max_messages=memory_window)        │
-│    messages = context.build_messages(                               │
-│        history=history,                                             │
-│        current_message=content,                                     │
-│        media=attachments                                            │
-│    )                                                                │
-│                                                                      │
-│ 3. 运行 Agent 循环                                                   │
-│    while iteration < max_iterations:                                │
-│        response = await provider.chat_stream(messages, tools)       │
-│        if response.has_tool_calls:                                  │
-│            执行工具调用                                              │
-│            添加工具结果到消息                                        │
-│        else:                                                        │
-│            返回最终响应                                              │
-│                                                                      │
-│ 4. 保存会话                                                          │
-│    _save_turn(session, messages, skip)                              │
-│    sessions.save(session)                                           │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 子Agent (Subagent) 系统架构
-
-```
-主Agent调用 spawn 工具
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ SpawnTool.execute() (tools/spawn.py)                                 │
-│                                                                      │
-│ 1. 匹配角色                                                          │
-│    role = role_manager.match_role_for_task(task)                    │
-│    或使用指定的 role 参数                                            │
-│                                                                      │
-│ 2. 创建任务                                                          │
-│    task_obj = task_manager.create_task(...)                         │
-│                                                                      │
-│ 3. 打包上下文                                                        │
-│    context_package = packer.pack_for_task(task, role, ...)          │
-│                                                                      │
-│ 4. 启动子Agent                                                       │
-│    await subagent_manager.spawn_with_role(task, role, context)      │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ SubagentManager.spawn_with_role() (subagent_manager.py)              │
-│                                                                      │
-│ 1. 获取角色定义                                                      │
-│    role = role_manager.get_role(role_name)                          │
-│                                                                      │
-│ 2. 创建独立工作空间                                                  │
-│    workspace = workspace/subagents/{task_id}/                       │
-│                                                                      │
-│ 3. 获取角色专用 Provider                                             │
-│    provider, model = provider_factory.create_provider(role.config)  │
-│                                                                      │
-│ 4. 构建角色工具集                                                    │
-│    tools = _build_tools_for_role(role, workspace)                   │
-│    - 根据角色 capabilities.allowed_tools 过滤                        │
-│                                                                      │
-│ 5. 异步执行任务                                                      │
-│    asyncio.create_task(_run_subagent(...))                          │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ _run_subagent() 执行流程                                             │
-│                                                                      │
-│ 1. 构建系统提示                                                      │
-│    system_prompt = _build_system_prompt(config)                     │
-│    - 包含角色定义、工作空间、能力边界                                │
-│                                                                      │
-│ 2. 构建任务提示                                                      │
-│    task_prompt = _build_task_prompt(config)                         │
-│    - 包含任务描述、上下文、约束                                      │
-│                                                                      │
-│ 3. 执行 Agent 循环                                                   │
-│    while iteration < max_iterations:                                │
-│        response = await provider.chat(messages, tools)              │
-│        执行工具调用...                                               │
-│                                                                      │
-│ 4. 收集产物                                                          │
-│    artifacts = _collect_artifacts(workspace/output/)                │
-│                                                                      │
-│ 5. 汇报完成                                                          │
-│    await _announce_completion(task, result)                         │
-│    - 发送系统消息到主Agent                                           │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 角色配置加载机制
-
-```
-AgentLoop._init_subagent_system()
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. 创建 RoleManager                                                  │
-│    role_manager = RoleManager()                                     │
-│    # 初始为空，无角色定义                                            │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. 加载默认角色                                                      │
-│    default_roles_path = Path(nanobot_config.__file__).parent /      │
-│                         "roles.yaml"                                │
-│    if default_roles_path.exists():                                  │
-│        role_manager._load_from_yaml(default_roles_path)             │
-│                                                                      │
-│ 默认角色:                                                            │
-│ - document_writer: 文档编写专家 📝                                   │
-│ - code_developer: 代码开发专家 💻                                    │
-│ - data_analyst: 数据分析专家 📊                                      │
-│ - researcher: 研究分析专家 🔍                                        │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. 加载用户自定义角色 (可选)                                         │
-│    user_roles_path = workspace / "config" / "roles.yaml"            │
-│    if user_roles_path.exists():                                     │
-│        role_manager._load_from_yaml(user_roles_path)                │
-│    # 用户角色会覆盖同名默认角色                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 会话历史管理
-
-```
-SessionManager (session/manager.py)
-    │
-    ├── 存储位置: ~/.nanobot/sessions/
-    │   文件格式: {channel}_{chat_id}.jsonl
-    │
-    ├── 内存缓存: LRU 缓存，最大 500 个会话
-    │   TTL: 24 小时
-    │
-    └── 持久化格式 (JSONL):
-        第一行: 元数据 {"_type": "metadata", "key": "...", ...}
-        后续行: 消息 {"role": "user/assistant/tool", "content": "...", ...}
-```
-
-### 文件上传处理流程
-
-```
-用户上传文件
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. 上传到临时目录 (routes/upload.py)                                 │
-│    - 验证文件类型和大小                                              │
-│    - 保存到 upload_dir                                              │
-│    - 返回文件路径                                                    │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. 构建文件提示 (context/builder.py)                                 │
-│    _build_user_content(text, media=[file_path])                     │
-│                                                                      │
-│    根据文件扩展名添加工具使用提示:                                    │
-│    - .doc → "使用 doc_read 工具读取"                                 │
-│    - .docx → "使用 docx_read_text 工具读取"                          │
-│    - .pdf → "使用 pdf_read_text 工具读取"                            │
-│    - .xlsx → "使用 excel_read 工具读取"                              │
-│    - .pptx → "使用 pptx_read 工具读取"                               │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. 模型调用相应工具读取文件                                          │
-│    工具执行后返回文件内容                                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 文件下载处理流程
-
-```
-模型调用 return_file 工具
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ ReturnFileTool.execute() (tools/return_file.py)                      │
-│                                                                      │
-│ 返回格式:                                                            │
-│ "FILE_RETURNED:{\"name\": \"xxx\", \"path\": \"xxx\", ...}"         │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ AgentLoop._save_turn() 保存消息                                      │
-│                                                                      │
-│ 特殊处理: FILE_RETURNED 消息不截断                                   │
-│ if content.startswith("FILE_RETURNED:"):                            │
-│     pass  # 保持完整                                                 │
-│ elif len(content) > _TOOL_RESULT_MAX_CHARS:                         │
-│     entry["content"] = content[:2000] + "\n... (truncated)"         │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 前端解析 (components.js)                                             │
-│                                                                      │
-│ 1. 解析 FILE_RETURNED 消息                                           │
-│    if (content.startsWith("FILE_RETURNED:")) {                      │
-│        const jsonStr = content.substring("FILE_RETURNED:".length);  │
-│        const fileInfo = JSON.parse(jsonStr);                        │
-│    }                                                                │
-│                                                                      │
-│ 2. 显示文件下载链接                                                  │
-│    渲染为可点击的下载按钮                                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 已知问题与修复记录
-
-### 问题 1: 子Agent角色未找到
-
-**症状**: `spawn: 错误：未找到角色 'researcher'`
-
-**原因**: `RoleManager` 初始化时未加载默认 `roles.yaml` 文件
-
-**修复位置**: `nanobot/agent/loop.py` 的 `_init_subagent_system` 方法
-
-**修复内容**:
-
-```python
-def _init_subagent_system(self, provider, workspace, bus, config):
-    from nanobot.agent.roles.manager import RoleManager
-    from nanobot import config as nanobot_config
-
-    role_manager = RoleManager()
-
-    # 加载默认角色
-    default_roles_path = Path(nanobot_config.__file__).parent / "roles.yaml"
-    if default_roles_path.exists():
-        role_manager._load_from_yaml(default_roles_path)
-
-    # 加载用户自定义角色
-    user_roles_path = workspace / "config" / "roles.yaml"
-    if user_roles_path.exists():
-        role_manager._load_from_yaml(user_roles_path)
-```
-
-### 问题 2: 工具结果截断导致文件下载失败
-
-**症状**: 页面刷新后文件下载链接消失
-
-**原因**: `_TOOL_RESULT_MAX_CHARS = 500` 太小，`FILE_RETURNED` JSON 被截断
-
-**修复位置**: `nanobot/agent/loop.py`
-
-**修复内容**:
-
-```python
-_TOOL_RESULT_MAX_CHARS = 2000  # 从 500 增加到 2000
-
-def _save_turn(self, session, messages, skip):
-    for m in messages[skip:]:
-        entry = {k: v for k, v in m.items() if k != "reasoning_content"}
-        if entry.get("role") == "tool" and isinstance(entry.get("content"), str):
-            content = entry["content"]
-            if content.startswith("FILE_RETURNED:"):
-                pass  # 不截断 FILE_RETURNED 消息
-            elif len(content) > self._TOOL_RESULT_MAX_CHARS:
-                entry["content"] = content[:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
-```
-
-### 问题 3: 上传文件后模型不知道使用哪个工具
-
-**症状**: 上传 .doc 文件后，模型尝试用 `read_file` 而非 `doc_read` 读取
-
-**原因**: 文件提示信息不够具体，未指明应使用的工具
-
-**修复位置**: `nanobot/agent/context/builder.py` 的 `_build_user_content` 方法
-
-**修复内容**:
-
-```python
-if ext == ".doc":
-    file_hints += f"- {name} (路径: {fpath}) → 使用 doc_read 工具读取\n"
-elif ext == ".docx":
-    file_hints += f"- {name} (路径: {fpath}) → 使用 docx_read_text 或 docx_read_structure 工具读取\n"
-# ... 其他文件类型类似
-```
-
-### 问题 4: 前端无法解析文件下载信息
-
-**症状**: 控制台报错 `JSON.parse` 失败
-
-**原因**: 正则表达式 `/FILE_RETURNED:(\{[^}]+\})/` 无法匹配包含多个字段的对象
-
-**修复位置**: `nanobot/web/static/js/components.js`
-
-**修复内容**:
-
-```javascript
-// 旧代码 (有问题)
-const match = content.match(/FILE_RETURNED:(\{[^}]+\})/);
-
-// 新代码 (修复后)
-if (content.startsWith("FILE_RETURNED:")) {
-  const jsonStr = content.substring("FILE_RETURNED:".length);
-  const fileInfo = JSON.parse(jsonStr);
-}
-```
-
-### 问题 5: XML 工具调用标签未清理
-
-**症状**: 某些模型的工具调用以 XML 格式嵌入内容，导致上下文污染
-
-**原因**: `_sanitize_messages` 未清理 XML 格式的工具调用
-
-**修复位置**: `nanobot/providers/litellm_provider.py`
-
-**修复内容**:
-
-```python
-def _sanitize_messages(self, messages):
-    for m in messages:
-        if clean.get("role") == "assistant" and clean.get("tool_calls"):
-            content = clean.get("content", "") or ""
-            xml_pattern = r'<invoke\s+name="[^"]*"[^>]*>.*?</invoke>'
-            content = re.sub(xml_pattern, "", content, flags=re.DOTALL)
-            clean["content"] = content or None
-```
-
-### 问题 6: 文件名特殊字符导致 JSON 解析失败
-
-**症状**: 文件名包含特殊字符（如双引号、换行符）时，前端无法解析 `FILE_RETURNED` 消息
-
-**原因**: 使用字符串拼接生成 JSON，未正确转义特殊字符
-
-**修复位置**: `nanobot/agent/tools/return_file.py`
-
-**修复内容**:
-
-```python
-# 旧代码 (有问题)
-return (
-    f"FILE_RETURNED:{{\"file_id\": \"{file_id}\", "
-    f"\"filename\": \"{dest_name}\", "
-    f"\"original_name\": \"{display}\", "  # display 可能包含特殊字符
-    f"\"file_type\": \"{self._get_file_type(ext)}\"}}"
-)
-
-# 新代码 (修复后)
-file_info = {
-    "file_id": file_id,
-    "filename": dest_name,
-    "original_name": display,
-    "file_type": self._get_file_type(ext),
-}
-return f"FILE_RETURNED:{json.dumps(file_info, ensure_ascii=False)}"
-```
-
-同时添加了文件名安全处理：
-
-```python
-safe_display = "".join(c if c.isalnum() or c in "._-" else "_" for c in display)
-```
-
----
-
-## 开发者注意事项
-
-### 1. 工具注册规范
-
-工具类必须继承 `Tool` 基类，并正确实现 `name`, `description`, `parameters` 属性：
-
-```python
-class MyTool(Tool):
-    @property
-    def name(self) -> str:
-        return "my_tool"
-
-    @property
-    def description(self) -> str:
-        return "工具描述"
-
-    @property
-    def parameters(self) -> dict:
-        return {
-            "type": "object",
-            "properties": {
-                "param1": {"type": "string", "description": "参数描述"}
-            },
-            "required": ["param1"]
-        }
-
-    async def execute(self, param1: str, **kwargs) -> str:
-        return "执行结果"
-```
-
-### 2. 角色配置格式
-
-`roles.yaml` 文件格式：
-
-```yaml
-roles:
-  document_writer:
-    name: 文档编写专家
-    description: 擅长编写各类技术文档
-    icon: 📝
-    enabled: true
-    model_config:
-      provider: deepseek
-      model: deepseek/deepseek-chat
-      temperature: 0.7
-      max_tokens: 8192
-    capabilities:
-      allowed_tools:
-        - read_file
-        - write_file
-        - edit_file
-      forbidden_tools:
-        - exec
-    system_prompt: |
-      你是一个专业的文档编写专家...
-    max_iterations: 15
-    timeout: 600
-```
-
-### 3. 会话消息格式
-
-保存到 JSONL 文件的消息格式：
-
-```json
-{"_type": "metadata", "key": "web:default", "created_at": "2024-01-01T00:00:00", ...}
-{"role": "user", "content": "你好", "timestamp": "2024-01-01T00:00:01"}
-{"role": "assistant", "content": "你好！有什么可以帮助你的？", "timestamp": "2024-01-01T00:00:05"}
-{"role": "tool", "tool_call_id": "xxx", "name": "read_file", "content": "文件内容..."}
-```
-
-### 4. FILE_RETURNED 协议
-
-文件下载使用特殊协议：
-
-```python
-# 工具返回格式
-return f"FILE_RETURNED:{json.dumps({
-    'name': 'example.pdf',
-    'path': '/path/to/file',
-    'size': 1024,
-    'mime_type': 'application/pdf'
-})}"
-```
-
-前端解析：
-
-```javascript
-if (content.startsWith("FILE_RETURNED:")) {
-  const fileInfo = JSON.parse(content.substring("FILE_RETURNED:".length));
-  // 渲染下载链接
-}
-```
-
----
-
-_本文档最后更新: 2026-03-14_
-
----
-
 ## 办公技能详细说明
 
 ### PDF 操作技能 (pdf-operations)
@@ -2843,3 +2162,7 @@ AI: [调用 pdf_read_text 工具]
 **安装依赖**：`pip install rapidocr-onnxruntime`
 
 **支持的图片格式**：PNG、JPG、JPEG、BMP、GIF、TIFF、WebP
+
+---
+
+_本文档最后更新: 2026-03-22 (版本 0.1.4.post3)_

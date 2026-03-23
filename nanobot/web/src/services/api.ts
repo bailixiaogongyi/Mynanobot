@@ -34,9 +34,9 @@ export const api = {
       });
     },
     setReasoning: (enableReasoning: boolean) =>
-      request("/config/model", {
+      request("/config/agent/defaults", {
         method: "POST",
-        body: JSON.stringify({ model: "", enable_reasoning: enableReasoning }),
+        body: JSON.stringify({ enable_reasoning: enableReasoning }),
       }),
     setToolCall: (enabled: boolean) =>
       request("/config/tools", {
