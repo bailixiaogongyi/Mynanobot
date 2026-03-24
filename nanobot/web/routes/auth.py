@@ -53,7 +53,8 @@ def get_whitelist_manager(request: Request) -> WhitelistManager:
 
 
 def get_auth_password(request: Request) -> str:
-    return request.app.state.auth_password
+    password = getattr(request.app.state, "auth_password", "") or ""
+    return password
 
 
 def is_auth_enabled(request: Request) -> bool:
@@ -66,6 +67,10 @@ async def login(request: Request, auth_request: AuthRequest):
         return {"success": True, "message": "Authentication disabled"}
 
     whitelist_manager = get_whitelist_manager(request)
+    if whitelist_manager is None:
+        logger.error("WhitelistManager is not initialized")
+        raise HTTPException(status_code=500, detail="Authentication system error")
+
     auth_password = get_auth_password(request)
 
     if whitelist_manager.is_allowed(auth_request.fingerprint):
@@ -91,6 +96,9 @@ async def verify_fingerprint(request: Request, auth_request: AuthRequest):
         return VerifyResponse(valid=True)
 
     whitelist_manager = get_whitelist_manager(request)
+    if whitelist_manager is None:
+        return VerifyResponse(valid=False)
+
     is_valid = whitelist_manager.is_allowed(auth_request.fingerprint)
     return VerifyResponse(valid=is_valid)
 
@@ -107,6 +115,9 @@ async def get_whitelist(request: Request):
         return {"fingerprints": [], "count": 0}
 
     whitelist_manager = get_whitelist_manager(request)
+    if whitelist_manager is None:
+        return {"fingerprints": [], "count": 0}
+
     fingerprints = whitelist_manager.get_all_fingerprints()
     return {
         "fingerprints": list(fingerprints),

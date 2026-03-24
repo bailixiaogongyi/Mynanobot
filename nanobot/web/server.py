@@ -141,7 +141,7 @@ def create_app(
             whitelist_file = Path(auth_config.whitelist_file).expanduser()
             app.state.whitelist_manager = WhitelistManager(whitelist_file)
 
-            auth_password = auth_config.password
+            auth_password = auth_config.password or ""
             if not auth_password:
                 auth_password = generate_secure_password()
                 auth_config.password = auth_password
