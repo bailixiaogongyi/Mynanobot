@@ -165,6 +165,19 @@ class QQConfig(Base):
     allow_from: list[str] = Field(default_factory=list)  # Allowed user openids (empty = public access)
 
 
+class WeixinConfig(Base):
+    """Personal WeChat channel configuration."""
+
+    enabled: bool = False
+    allow_from: list[str] = Field(default_factory=list)
+    base_url: str = "https://ilinkai.weixin.qq.com"
+    cdn_base_url: str = "https://novac2c.cdn.weixin.qq.com/c2c"
+    route_tag: str | int | None = None
+    token: str = ""  # Manually set token, or obtained via QR login
+    state_dir: str = ""  # Default: ~/.nanobot/weixin/
+    poll_timeout: int = 35  # seconds for long-poll
+
+
 class ChannelsConfig(Base):
     """Configuration for chat channels."""
 
@@ -179,6 +192,7 @@ class ChannelsConfig(Base):
     email: EmailConfig = Field(default_factory=EmailConfig)
     slack: SlackConfig = Field(default_factory=SlackConfig)
     qq: QQConfig = Field(default_factory=QQConfig)
+    weixin: WeixinConfig = Field(default_factory=WeixinConfig)
 
 
 class AgentDefaults(Base):

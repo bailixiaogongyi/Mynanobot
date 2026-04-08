@@ -115,3 +115,44 @@ def parse_session_key(key: str) -> tuple[str, str]:
     if len(parts) != 2:
         raise ValueError(f"Invalid session key: {key}")
     return parts[0], parts[1]
+
+
+def split_message(content: str, max_len: int = 2000) -> list[str]:
+    """
+    Split content into chunks within max_len, preferring line breaks.
+    
+    Args:
+        content: The text content to split.
+        max_len: Maximum length per chunk (default 2000 for Discord compatibility).
+    
+    Returns:
+        List of message chunks, each within max_len.
+    """
+    if not content:
+        return []
+    if len(content) <= max_len:
+        return [content]
+    
+    chunks: list[str] = []
+    while content:
+        if len(content) <= max_len:
+            chunks.append(content)
+            break
+        
+        cut = content[:max_len]
+        last_newline = cut.rfind('\n')
+        last_space = cut.rfind(' ')
+        
+        if last_newline > max_len // 2:
+            split_pos = last_newline + 1
+        elif last_space > max_len // 2:
+            split_pos = last_space + 1
+        else:
+            split_pos = max_len
+        
+        chunk = content[:split_pos].strip()
+        if chunk:
+            chunks.append(chunk)
+        content = content[split_pos:].strip()
+    
+    return chunks

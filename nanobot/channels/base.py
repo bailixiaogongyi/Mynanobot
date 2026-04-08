@@ -1,6 +1,7 @@
 """Base channel interface for chat platforms."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -18,6 +19,9 @@ class BaseChannel(ABC):
     """
     
     name: str = "base"
+    display_name: str = "Base"
+    transcription_provider: str = "groq"
+    transcription_api_key: str = ""
     
     def __init__(self, config: Any, bus: MessageBus):
         """
@@ -30,6 +34,34 @@ class BaseChannel(ABC):
         self.config = config
         self.bus = bus
         self._running = False
+    
+    async def transcribe_audio(self, file_path: str | Path) -> str:
+        """Transcribe an audio file via Whisper (OpenAI or Groq). Returns empty string on failure."""
+        if not self.transcription_api_key:
+            return ""
+        try:
+            if self.transcription_provider == "openai":
+                from nanobot.providers.transcription import OpenAITranscriptionProvider
+                provider = OpenAITranscriptionProvider(api_key=self.transcription_api_key)
+            else:
+                from nanobot.providers.transcription import GroqTranscriptionProvider
+                provider = GroqTranscriptionProvider(api_key=self.transcription_api_key)
+            return await provider.transcribe(file_path)
+        except Exception as e:
+            logger.warning("{}: audio transcription failed: {}", self.name, e)
+            return ""
+    
+    async def login(self, force: bool = False) -> bool:
+        """
+        Perform channel-specific interactive login (e.g. QR code scan).
+        
+        Args:
+            force: If True, ignore existing credentials and force re-authentication.
+        
+        Returns True if already authenticated or login succeeds.
+        Override in subclasses that support interactive login.
+        """
+        return True
     
     @abstractmethod
     async def start(self) -> None:
@@ -57,6 +89,25 @@ class BaseChannel(ABC):
             msg: The message to send.
         """
         pass
+    
+    async def send_delta(self, chat_id: str, delta: str, metadata: dict[str, Any] | None = None) -> None:
+        """Deliver a streaming text chunk.
+        
+        Override in subclasses to enable streaming. Implementations should
+        raise on delivery failure so the channel manager can retry.
+        
+        Streaming contract: ``_stream_delta`` is a chunk, ``_stream_end`` ends
+        the current segment, and stateful implementations must key buffers by
+        ``_stream_id`` rather than only by ``chat_id``.
+        """
+        pass
+    
+    @property
+    def supports_streaming(self) -> bool:
+        """True when config enables streaming AND this subclass implements send_delta."""
+        cfg = self.config
+        streaming = cfg.get("streaming", False) if isinstance(cfg, dict) else getattr(cfg, "streaming", False)
+        return bool(streaming) and type(self).send_delta is not BaseChannel.send_delta
     
     def is_allowed(self, sender_id: str) -> bool:
         """
@@ -124,6 +175,11 @@ class BaseChannel(ABC):
         )
         
         await self.bus.publish_inbound(msg)
+    
+    @classmethod
+    def default_config(cls) -> dict[str, Any]:
+        """Return default config for onboard. Override in plugins to auto-populate config.json."""
+        return {"enabled": False}
     
     @property
     def is_running(self) -> bool:
