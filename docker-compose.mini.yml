@@ -3,8 +3,8 @@
 # 适用于 2GB 内存服务器，2 个 nanobot 实例共用 1 个 ollama 服务
 #
 # 内存分配:
-#   - nanobot-user1: 256MB
-#   - nanobot-user2: 256MB
+#   - nanobot-user1: 512MB
+#   - nanobot-user2: 512MB
 #   - ollama: 512MB
 #   - 系统预留: ~1GB
 #   - 总计: ~2GB
@@ -15,10 +15,13 @@
 #   - ollama: 11434 (Embedding API)
 #
 # 部署步骤:
-#   1. docker compose -f docker-compose.mini.yml build nanobot-user1 nanobot-user2
-#   2. docker compose -f docker-compose.mini.yml up -d
-#   3. docker exec nanobot-ollama ollama pull nomic-embed-text  (首次手动拉取模型)
-#   4. 访问 http://localhost:8081 和 http://localhost:8082
+#   1. 创建配置文件目录:
+#      - Linux/Mac: ~/.nanobot-user1/config.json 和 ~/.nanobot-user2/config.json
+#      - 参考 config.example.json 模板填入 API Key
+#   2. docker compose -f docker-compose.mini.yml build nanobot-user1 nanobot-user2
+#   3. docker compose -f docker-compose.mini.yml up -d
+#   4. docker exec nanobot-ollama ollama pull nomic-embed-text  (首次手动拉取模型)
+#   5. 访问 http://localhost:8081 和 http://localhost:8082
 
 services:
   ollama:
@@ -50,15 +53,7 @@ services:
       - "8081:8080"
       - "18791:18790"
     volumes:
-      - ~/.nanobot-user1:/root/.nanobot
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
-      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
-      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
-      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
-      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
+      - ${NANOBOT_USER1_DIR}:/root/.nanobot
     depends_on:
       - ollama
     restart: unless-stopped
@@ -66,7 +61,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 256M
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
@@ -92,15 +87,7 @@ services:
       - "8082:8080"
       - "18792:18790"
     volumes:
-      - ~/.nanobot-user2:/root/.nanobot
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
-      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
-      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
-      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
-      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
+      - ${NANOBOT_USER2_DIR}:/root/.nanobot
     depends_on:
       - ollama
     restart: unless-stopped
@@ -108,7 +95,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 256M
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s

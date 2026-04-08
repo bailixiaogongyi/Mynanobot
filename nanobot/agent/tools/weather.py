@@ -1,6 +1,5 @@
 """Weather tool using Seniverse API (适合国内网络环境)."""
 
-import os
 from typing import Any
 
 import httpx
@@ -44,10 +43,10 @@ class WeatherTool(Tool):
 
     @property
     def api_key(self) -> str:
-        """Resolve API key at call time so env/config changes are picked up."""
+        """Resolve API key from config at call time."""
         if self._api_key_getter:
             return self._api_key_getter() or ""
-        return self._init_api_key or os.environ.get("SENIVERSE_API_KEY", "")
+        return self._init_api_key or ""
 
     async def execute(
         self, 
@@ -169,7 +168,7 @@ class WeatherForecastTool(Tool):
     def api_key(self) -> str:
         if self._api_key_getter:
             return self._api_key_getter() or ""
-        return self._init_api_key or os.environ.get("SENIVERSE_API_KEY", "")
+        return self._init_api_key or ""
 
     async def execute(
         self, 

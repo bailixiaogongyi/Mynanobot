@@ -393,9 +393,19 @@ def _make_provider(config: Config):
     from nanobot.providers.registry import find_by_name
     spec = find_by_name(provider_name)
     if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and spec.is_oauth):
-        console.print("[red]Error: No API key configured.[/red]")
-        console.print("Set one in ~/.nanobot/config.json under providers section")
-        raise typer.Exit(1)
+        console.print("[yellow]Warning: No API key configured for the default provider.[/yellow]")
+        console.print("You can configure API keys in the Web UI at http://localhost:8080 → Settings")
+        console.print("Or edit: ~/.nanobot/config.json")
+        console.print("The service will start, but chat functionality requires a valid API key.\n")
+        
+        from nanobot.providers.litellm_provider import LiteLLMProvider
+        return LiteLLMProvider(
+            api_key=None,
+            api_base=config.get_api_base(model),
+            default_model=model,
+            extra_headers=p.extra_headers if p else None,
+            provider_name=provider_name,
+        )
 
     return LiteLLMProvider(
         api_key=p.api_key if p else None,

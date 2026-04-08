@@ -217,13 +217,16 @@ class HybridRetriever:
     def _get_embedder(self) -> Any:
         """Lazily load the embedding model or use Ollama with fallback."""
         if self._embedder is None:
-            import os
+            from nanobot.config import load_config
 
-            env_ollama_url = os.environ.get("OLLAMA_BASE_URL")
-            ollama_model = os.environ.get("OLLAMA_EMBEDDING_MODEL", self.model_name)
+            config = load_config()
+            knowledge_config = config.tools.knowledge.index
+            
+            env_ollama_url = config.tools.knowledge.index.ollama_base_url
+            ollama_model = config.tools.knowledge.index.ollama_embedding_model
 
-            use_ollama = self.use_ollama or bool(env_ollama_url)
-            ollama_base_url = env_ollama_url or self.ollama_base_url
+            use_ollama = knowledge_config.use_ollama or bool(env_ollama_url)
+            ollama_base_url = env_ollama_url or knowledge_config.ollama_base_url
 
             if use_ollama and ollama_base_url:
                 ollama_embedder = OllamaEmbedder(

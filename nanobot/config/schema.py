@@ -381,6 +381,7 @@ class KnowledgeIndexConfig(Base):
     fallback_on_llm_error: bool = True
     use_ollama: bool = False
     ollama_base_url: str = "http://localhost:11434"
+    ollama_embedding_model: str = "nomic-embed-text"
 
 
 class KnowledgeSearchConfig(Base):

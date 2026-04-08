@@ -10,25 +10,25 @@
 #
 # 首次部署步骤：
 #   1. mkdir -p ~/.nanobot
-#   2. 创建配置文件 ~/.nanobot/config.json（填入API密钥）
-#      或通过环境变量配置（见下方 environment 示例）
+#   2. 创建配置文件 ~/.nanobot/config.json（参考 config.example.json）
 #   3. docker compose up -d nanobot-gateway
 #   4. 容器启动时会自动执行 onboard 初始化工作空间
 #
-# 环境变量配置（可选）：
-#   NANOBOT_DEEPSEEK_API_KEY    - DeepSeek API Key
-#   NANOBOT_OPENAI_API_KEY      - OpenAI API Key
-#   NANOBOT_ANTHROPIC_API_KEY   - Anthropic API Key
-#   NANOBOT_OPENROUTER_API_KEY  - OpenRouter API Key
-#   NANOBOT_WEB_PASSWORD        - Web UI 访问密码
-#   NANOBOT_PERSISTENCE_SECRET  - 数据持久化签名密钥
+# 配置文件说明：
+#   - 配置文件模板见 config.example.json
+#   - 所有配置项都通过 config.json 管理（推荐）
+#   - 也可以通过环境变量配置（需使用 Pydantic 格式）：
+#     NANOBOT_PROVIDERS__DEEPSEEK__API_KEY
+#     NANOBOT_PROVIDERS__OPENAI__API_KEY
+#     NANOBOT_WEB__PASSWORD
+#     NANOBOT_PERSISTENCE__SECRET
 
 x-common-config: &common-config
   build:
     context: .
     dockerfile: Dockerfile
   volumes:
-    - ~/.nanobot:/root/.nanobot
+    - ${NANOBOT_DIR}:/root/.nanobot
   restart: unless-stopped
   networks:
     - nanobot-network
@@ -41,13 +41,6 @@ services:
     ports:
       - "18790:18790"
       - "8080:8080"
-    environment:
-      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
-      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
-      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
-      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
-      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
-      - NANOBOT_PERSISTENCE_SECRET=${NANOBOT_PERSISTENCE_SECRET:-}
     deploy:
       resources:
         limits:
@@ -76,11 +69,6 @@ services:
     command: ["agent"]
     stdin_open: true
     tty: true
-    environment:
-      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
-      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
-      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
-      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
     deploy:
       resources:
         limits:
@@ -88,7 +76,7 @@ services:
           memory: 1G
         reservations:
           cpus: "0.25"
-          memory: 256M
+          memory: 512M
 
 networks:
   nanobot-network:

@@ -1,7 +1,7 @@
 ---
 name: Web 搜索
 description: 使用博查搜索 API 搜索网络获取最新信息，适合国内网络环境
-metadata: {"nanobot": {"always": false, "requires": {"env": ["BOCHA_API_KEY"]}}}
+metadata: {"nanobot": {"always": false}}
 ---
 
 # Web 搜索技能
@@ -47,10 +47,7 @@ web_search(
 
 使用此技能需要配置博查搜索 API key：
 
-1. **环境变量方式**:
-   - 设置 `BOCHA_API_KEY` 环境变量
-
-2. **配置文件方式**:
+1. **配置文件方式（推荐）**:
    - 在 `~/.nanobot/config.json` 中添加：
    ```json
    {
@@ -101,7 +98,7 @@ web_search(query="最新智能手机对比 2026", freshness="oneMonth")
 如果遇到以下错误：
 
 1. **API key 未配置**:
-   - 请按照配置要求设置 `BOCHA_API_KEY`
+   - 请在配置文件中设置 `tools.web.search.apiKey`
 
 2. **搜索无结果**:
    - 尝试使用更具体的搜索词

@@ -1,0 +1,166 @@
+{
+  "agents": {
+    "defaults": {
+      "model": "deepseek/deepseek-chat",
+      "provider": "deepseek",
+      "workspace": "~/nanobot-workspace"
+    },
+    "recentModels": [
+      {
+        "model": "deepseek/deepseek-chat",
+        "provider": "deepseek"
+      }
+    ]
+  },
+  "providers": {
+    "deepseek": {
+      "apiKey": "your-deepseek-api-key"
+    },
+    "openai": {
+      "apiKey": "your-openai-api-key",
+      "apiBase": "https://api.openai.com/v1"
+    },
+    "anthropic": {
+      "apiKey": "your-anthropic-api-key"
+    },
+    "openrouter": {
+      "apiKey": "your-openrouter-api-key"
+    },
+    "custom": {
+      "apiKey": "your-custom-api-key",
+      "apiBase": "https://your-custom-endpoint.com/v1"
+    },
+    "zhipu": {
+      "apiKey": "your-zhipu-api-key"
+    },
+    "dashscope": {
+      "apiKey": "your-dashscope-api-key"
+    },
+    "siliconflow": {
+      "apiKey": "your-siliconflow-api-key"
+    },
+    "volcengine": {
+      "apiKey": "your-volcengine-api-key"
+    }
+  },
+  "gateway": {
+    "heartbeat": {
+      "enabled": true,
+      "intervalS": 1800
+    },
+    "webUi": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 8080,
+      "auth": {
+        "enabled": false,
+        "password": "your-web-password"
+      }
+    }
+  },
+  "tools": {
+    "web": {
+      "search": {
+        "enabled": true,
+        "apiKey": "your-bocha-search-api-key",
+        "maxResults": 10
+      }
+    },
+    "weather": {
+      "enabled": true,
+      "apiKey": "your-seniverse-api-key"
+    },
+    "exec": {
+      "enabled": true,
+      "timeout": 60,
+      "restrictToWorkspace": false
+    },
+    "imageGeneration": {
+      "enabled": true,
+      "defaultProvider": "siliconflow"
+    },
+    "mcpServers": {},
+    "mcpEnabled": false,
+    "knowledge": {
+      "index": {
+        "enabled": true,
+        "embeddingModel": "BAAI/bge-small-zh-v1.5",
+        "persistDir": "~/.nanobot/knowledge",
+        "chunkSize": 512,
+        "chunkOverlap": 50,
+        "useBm25": true,
+        "useVector": true,
+        "useOllama": false,
+        "ollamaBaseUrl": "http://localhost:11434",
+        "ollamaEmbeddingModel": "nomic-embed-text"
+      },
+      "search": {
+        "defaultTopK": 5,
+        "cacheEnabled": true
+      },
+      "autoIndexNotes": true,
+      "notesDirs": [
+        "daily",
+        "projects",
+        "personal",
+        "topics",
+        "pending"
+      ]
+    }
+  },
+  "upload": {
+    "maxSize": 10485760,
+    "allowedTypes": [
+      "text/plain",
+      "text/markdown",
+      "application/pdf",
+      "application/json",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ]
+  },
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "token": "your-telegram-bot-token"
+    },
+    "discord": {
+      "enabled": false,
+      "token": "your-discord-bot-token"
+    },
+    "feishu": {
+      "enabled": false,
+      "appId": "your-feishu-app-id",
+      "appSecret": "your-feishu-app-secret"
+    },
+    "dingtalk": {
+      "enabled": false,
+      "clientId": "your-dingtalk-app-key",
+      "clientSecret": "your-dingtalk-app-secret"
+    },
+    "slack": {
+      "enabled": false,
+      "token": "your-slack-bot-token"
+    },
+    "whatsapp": {
+      "enabled": false
+    },
+    "email": {
+      "enabled": false,
+      "smtpHost": "smtp.example.com",
+      "smtpPort": 587,
+      "smtpUser": "your-email@example.com",
+      "smtpPassword": "your-email-password",
+      "fromAddress": "your-email@example.com"
+    },
+    "qq": {
+      "enabled": false
+    },
+    "mochat": {
+      "enabled": false,
+      "clawToken": "your-mochat-claw-token",
+      "agentUserId": "your-mochat-agent-user-id"
+    }
+  }
+}
