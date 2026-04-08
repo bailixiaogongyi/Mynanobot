@@ -442,6 +442,8 @@ async def index_notes(
                 use_bm25=index_config.use_bm25,
                 use_vector=index_config.use_vector,
                 use_graph=getattr(index_config, 'use_graph', False),
+                use_ollama=getattr(index_config, 'use_ollama', False),
+                ollama_base_url=getattr(index_config, 'ollama_base_url', 'http://localhost:11434'),
             )
 
         processor = NoteProcessor(

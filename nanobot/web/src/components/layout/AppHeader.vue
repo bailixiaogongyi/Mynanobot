@@ -63,6 +63,7 @@ const navItems = [
   { path: "/tasks", label: "任务", icon: "📋" },
   { path: "/notes", label: "笔记", icon: "📝" },
   { path: "/skills", label: "技能", icon: "🛠️" },
+  { path: "/marketplace", label: "市场", icon: "🛒" },
   { path: "/config", label: "配置", icon: "⚙️" },
 ];
 

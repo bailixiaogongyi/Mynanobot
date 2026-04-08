@@ -18,7 +18,6 @@ The skill format and metadata structure follow OpenClaw's conventions to maintai
 
 | Skill                | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| `browser-script`    | 浏览器脚本执行器，支持 JSON 和 Python 格式脚本        |
 | `github`             | Interact with GitHub using the `gh` CLI              |
 | `weather`            | Get weather info using wttr.in and Open-Meteo        |
 | `summarize`          | Summarize URLs, files, and YouTube videos            |

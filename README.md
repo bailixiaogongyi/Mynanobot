@@ -766,7 +766,7 @@ It will NOT be shown again.
 **方式一：从源码安装（推荐开发使用）**
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
+git clone https://github.com/bailixiaogongyi/Mynanobot.git
 cd nanobot
 pip install -e ".[web-ui]"
 
@@ -808,7 +808,7 @@ pip install "nanobot-ai[web-ui]"
 
 ```bash
 # 1. 克隆源码
-git clone https://github.com/HKUDS/nanobot.git
+git clone https://github.com/bailixiaogongyi/Mynanobot.git
 cd nanobot
 
 # 2. 创建虚拟环境
@@ -828,8 +828,8 @@ nanobot --version
 
 ```powershell
 # 1. 克隆源码
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
+git clone https://github.com/bailixiaogongyi/Mynanobot.git
+cd Mynanobot
 
 # 2. 创建虚拟环境
 python -m venv .venv
@@ -1641,8 +1641,8 @@ tar -xzvf /tmp/huggingface_cache.tar.gz -C ~/
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
+git clone https://github.com/bailixiaogongyi/Mynanobot.git
+cd Mynanobot
 
 # 2. 构建镜像
 docker compose build
@@ -2090,8 +2090,8 @@ chmod 600 ~/.nanobot/config.json
 
 ### 相关链接
 
-- 官方仓库: https://github.com/HKUDS/nanobot
-- 问题反馈: https://github.com/HKUDS/nanobot/issues
+- 官方仓库: https://github.com/bailixiaogongyi/Mynanobot
+- 问题反馈: https://github.com/bailixiaogongyi/Mynanobot/issues
 - Discord 社区: https://discord.gg/MnCvHqpUGB
 - 博查搜索: https://bocha.ai
 - 心知天气: https://www.seniverse.com

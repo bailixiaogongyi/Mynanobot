@@ -37,7 +37,7 @@ import ImagePreview from "@/components/ui/ImagePreview.vue";
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .fade-enter-active,

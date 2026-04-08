@@ -103,18 +103,27 @@ class KnowledgeManager:
         try:
             from nanobot.knowledge.hybrid_retriever import HybridRetriever
 
-            model_name = "BAAI/bge-small-zh-v1.5"
             use_bm25 = True
             use_vector = True
             use_graph = False
             rrf_k = 60
             cache_enabled = True
             persist_dir = get_data_path() / "knowledge"
+            use_ollama = False
+            ollama_base_url = 'http://localhost:11434'
+            model_name = "BAAI/bge-small-zh-v1.5"
 
             if self.config:
                 index_config = getattr(self.config, 'index', None)
                 if index_config:
-                    model_name = getattr(index_config, 'embedding_model', model_name)
+                    use_ollama = getattr(index_config, 'use_ollama', False)
+                    ollama_base_url = getattr(index_config, 'ollama_base_url', 'http://localhost:11434')
+                    
+                    if use_ollama:
+                        model_name = getattr(index_config, 'embedding_model', "nomic-embed-text")
+                    else:
+                        model_name = getattr(index_config, 'embedding_model', model_name)
+                    
                     use_bm25 = getattr(index_config, 'use_bm25', use_bm25)
                     use_vector = getattr(index_config, 'use_vector', use_vector)
                     use_graph = getattr(index_config, 'use_graph', use_graph)
@@ -133,7 +142,9 @@ class KnowledgeManager:
                 use_vector=use_vector,
                 use_graph=use_graph,
                 rrf_k=rrf_k,
-                cache_enabled=cache_enabled
+                cache_enabled=cache_enabled,
+                use_ollama=use_ollama,
+                ollama_base_url=ollama_base_url,
             )
 
             self._retriever.load_indexes()

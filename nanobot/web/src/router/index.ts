@@ -34,6 +34,13 @@ const routes = [
         meta: { title: "技能" },
       },
       {
+        path: "marketplace",
+        name: "marketplace",
+        component: () =>
+          import("@/components/marketplace/MarketplacePage.vue"),
+        meta: { title: "技能市场", cache: false },
+      },
+      {
         path: "config/:section?",
         name: "config",
         component: () => import("@/components/config/ConfigPage.vue"),

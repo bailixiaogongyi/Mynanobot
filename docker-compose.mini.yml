@@ -1,0 +1,131 @@
+# AiMate Mini Deployment - 2GB RAM Optimized
+#
+# 适用于 2GB 内存服务器，2 个 nanobot 实例共用 1 个 ollama 服务
+#
+# 内存分配:
+#   - nanobot-user1: 256MB
+#   - nanobot-user2: 256MB
+#   - ollama: 512MB
+#   - 系统预留: ~1GB
+#   - 总计: ~2GB
+#
+# 端口分配:
+#   - nanobot-user1: 8081 (Web UI), 18791 (API)
+#   - nanobot-user2: 8082 (Web UI), 18792 (API)
+#   - ollama: 11434 (Embedding API)
+#
+# 部署步骤:
+#   1. docker compose -f docker-compose.mini.yml build nanobot-user1 nanobot-user2
+#   2. docker compose -f docker-compose.mini.yml up -d
+#   3. docker exec nanobot-ollama ollama pull nomic-embed-text  (首次手动拉取模型)
+#   4. 访问 http://localhost:8081 和 http://localhost:8082
+
+services:
+  ollama:
+    container_name: nanobot-ollama
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    expose:
+      - "11434"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - nanobot-network
+
+  nanobot-user1:
+    container_name: nanobot-user1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nanobot-aimated:latest
+    command: ["gateway"]
+    ports:
+      - "8081:8080"
+      - "18791:18790"
+    volumes:
+      - C:/Users/Administrator/.nanobot-user1:/root/.nanobot
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
+      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
+      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
+      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
+      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - nanobot-network
+
+  nanobot-user2:
+    container_name: nanobot-user2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nanobot-aimated:latest
+    command: ["gateway"]
+    ports:
+      - "8082:8080"
+      - "18792:18790"
+    volumes:
+      - C:/Users/Administrator/.nanobot-user2:/root/.nanobot
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+      - NANOBOT_DEEPSEEK_API_KEY=${NANOBOT_DEEPSEEK_API_KEY:-}
+      - NANOBOT_OPENAI_API_KEY=${NANOBOT_OPENAI_API_KEY:-}
+      - NANOBOT_ANTHROPIC_API_KEY=${NANOBOT_ANTHROPIC_API_KEY:-}
+      - NANOBOT_OPENROUTER_API_KEY=${NANOBOT_OPENROUTER_API_KEY:-}
+      - NANOBOT_WEB_PASSWORD=${NANOBOT_WEB_PASSWORD:-}
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - nanobot-network
+
+volumes:
+  ollama-data:
+
+networks:
+  nanobot-network:
+    driver: bridge

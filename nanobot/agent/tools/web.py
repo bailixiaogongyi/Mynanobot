@@ -95,10 +95,14 @@ class WebSearchTool(Tool):
 
     @property
     def api_key(self) -> str:
-        """Resolve API key at call time so env/config changes are picked up."""
+        """Resolve API key at call time so config changes are picked up."""
         if self._api_key_getter:
-            return self._api_key_getter() or ""
-        return self._init_api_key or os.environ.get("BOCHA_API_KEY", "")
+            key = self._api_key_getter()
+            if key:
+                return key
+        if self._init_api_key:
+            return self._init_api_key
+        return ""
 
     async def execute(
         self, 
@@ -111,8 +115,7 @@ class WebSearchTool(Tool):
         if not self.api_key:
             return (
                 "Error: 博查搜索 API key 未配置。"
-                "请在 ~/.nanobot/config.json 的 tools.web.search.apiKey 中设置 "
-                "(或设置环境变量 BOCHA_API_KEY)，然后重启网关。"
+                "请在 ~/.nanobot/config.json 的 tools.web.search.apiKey 中设置，然后重启网关。"
             )
         
         try:

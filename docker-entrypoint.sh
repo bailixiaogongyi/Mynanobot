@@ -16,6 +16,16 @@ mkdir -p "$WORKSPACE_DIR"
 mkdir -p "$KNOWLEDGE_DIR"
 mkdir -p "$CRON_DIR"
 
+# 创建笔记子目录
+mkdir -p "$WORKSPACE_DIR/daily"
+mkdir -p "$WORKSPACE_DIR/projects"
+mkdir -p "$WORKSPACE_DIR/personal"
+mkdir -p "$WORKSPACE_DIR/topics"
+mkdir -p "$WORKSPACE_DIR/pending"
+mkdir -p "$WORKSPACE_DIR/memory"
+mkdir -p "$WORKSPACE_DIR/skills"
+mkdir -p "$WORKSPACE_DIR/sessions"
+
 # 检查配置文件是否存在，不存在则创建默认配置
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "[nanobot] Creating default configuration..."
@@ -27,30 +37,44 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "defaults": {
       "workspace": "~/.nanobot/workspace",
       "model": "anthropic/claude-opus-4-5",
+      "provider": "anthropic",
       "max_tokens": 8192,
       "temperature": 0.1,
       "max_tool_iterations": 40,
-      "memory_window": 100
-    }
+      "memory_window": 100,
+      "enable_reasoning": true
+    },
+    "subagent": {
+      "enabled": true,
+      "version": "v2",
+      "max_concurrent": 5,
+      "default_timeout": 600,
+      "workspace_isolation": true,
+      "progress_report_interval": 10
+    },
+    "roles": {}
   },
   "providers": {
-    "custom": { "api_key": "" },
-    "anthropic": { "api_key": "" },
-    "openai": { "api_key": "" },
-    "openrouter": { "api_key": "" },
-    "deepseek": { "api_key": "" },
-    "groq": { "api_key": "" },
-    "zhipu": { "api_key": "" },
-    "dashscope": { "api_key": "" },
-    "vllm": { "api_key": "" },
-    "gemini": { "api_key": "" },
-    "moonshot": { "api_key": "" },
-    "minimax": { "api_key": "" },
-    "aihubmix": { "api_key": "" },
-    "siliconflow": { "api_key": "" },
-    "volcengine": { "api_key": "" },
-    "openai_codex": { "api_key": "" },
-    "github_copilot": { "api_key": "" }
+    "custom": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "anthropic": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "openai": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "openrouter": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "deepseek": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "groq": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "zhipu": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "dashscope": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "vllm": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "gemini": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "moonshot": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "minimax": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "aihubmix": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "siliconflow": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "volcengine": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "openai_codex": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "github_copilot": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "scnet": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "qiniu": { "apiKey": "", "apiBase": null, "extraHeaders": null },
+    "baishan": { "apiKey": "", "apiBase": null, "extraHeaders": null }
   },
   "gateway": {
     "host": "0.0.0.0",
@@ -73,30 +97,42 @@ if [ ! -f "$CONFIG_FILE" ]; then
   "tools": {
     "web": {
       "search": {
+        "enabled": true,
         "api_key": "",
         "max_results": 10
       }
     },
     "weather": {
       "weather": {
+        "enabled": true,
         "api_key": ""
       }
     },
     "exec": {
       "timeout": 60
     },
+    "image_generation": {
+      "enabled": false,
+      "provider": "dashscope",
+      "model": "wan21-turbo",
+      "api_key": "",
+      "api_base": ""
+    },
     "restrict_to_workspace": false,
     "mcp_servers": {},
+    "mcp_enabled": false,
     "knowledge": {
       "index": {
-        "enabled": false,
-        "embedding_model": "BAAI/bge-small-zh-v1.5",
+        "enabled": true,
+        "embedding_model": "nomic-embed-text",
         "persist_dir": "~/.nanobot/knowledge",
         "chunk_size": 512,
         "chunk_overlap": 50,
         "use_bm25": true,
         "use_vector": true,
-        "rrf_k": 60
+        "rrf_k": 60,
+        "use_ollama": true,
+        "ollama_base_url": "http://ollama:11434"
       },
       "search": {
         "default_top_k": 5,
@@ -192,6 +228,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
       "secret": "",
       "allow_from": []
     }
+  },
+  "upload": {
+    "enabled": true,
+    "max_file_size": 20971520,
+    "allowed_image_types": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"],
+    "allowed_doc_types": [".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".xlsx", ".xls", ".pptx"]
   }
 }
 EOF

@@ -196,10 +196,6 @@ def onboard():
     sessions_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"  [dim]✓ sessions/[/dim]")
     
-    browser_dir = data_dir / "browser"
-    browser_dir.mkdir(parents=True, exist_ok=True)
-    console.print(f"  [dim]✓ browser/[/dim]")
-    
     # Create workspace
     workspace = get_workspace_path()
     
@@ -207,13 +203,10 @@ def onboard():
         workspace.mkdir(parents=True, exist_ok=True)
         console.print(f"[green]✓[/green] Created workspace at {workspace}")
     
-    # Initialize workspace directories (daily, projects, personal, topics, pending, memory, skills, sessions, browser/scripts)
+    # Initialize workspace directories (daily, projects, personal, topics, pending, memory, skills, sessions)
     dirs = init_workspace_directories(workspace)
     for name, path in dirs.items():
         console.print(f"  [dim]✓ {name}/[/dim]")
-    
-    # Copy example browser scripts if they don't exist
-    _copy_browser_scripts()
     
     # Copy roles.yaml if it doesn't exist
     roles_src = Path(__file__).parent.parent / "config" / "roles.yaml"
@@ -231,7 +224,7 @@ def onboard():
     console.print("  1. Add your API key to [cyan]~/.nanobot/config.json[/cyan]")
     console.print("     Get one at: https://openrouter.ai/keys")
     console.print("  2. Chat: [cyan]nanobot agent -m \"Hello!\"[/cyan]")
-    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanobot#-chat-apps[/dim]")
+    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/bailixiaogongyi/Mynanobot#-chat-apps[/dim]")
 
 
 def _create_full_config() -> Config:
@@ -342,30 +335,6 @@ def _create_full_config() -> Config:
             max_file_size=20971520,
         ),
     )
-
-
-def _copy_browser_scripts():
-    """Copy example browser scripts to user data directory."""
-    import shutil
-    from nanobot.utils.helpers import get_data_path
-    
-    # Source: project's data/browser/scripts directory
-    source_dir = Path(__file__).parent.parent / "data" / "browser" / "scripts"
-    # Destination: ~/.nanobot/browser/scripts
-    dest_dir = get_data_path() / "browser" / "scripts"
-    
-    if not source_dir.exists():
-        return
-    
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Copy each script file if it doesn't exist
-    for src_file in source_dir.glob("*"):
-        if src_file.is_file():
-            dest_file = dest_dir / src_file.name
-            if not dest_file.exists():
-                shutil.copy2(src_file, dest_file)
-                console.print(f"  [dim]Copied {src_file.name} to browser/scripts/[/dim]")
 
 
 def _create_workspace_templates(workspace: Path):
@@ -617,6 +586,8 @@ def gateway(
                         use_bm25=config.tools.knowledge.index.use_bm25,
                         use_vector=config.tools.knowledge.index.use_vector,
                         use_graph=getattr(config.tools.knowledge.index, 'use_graph', False),
+                        use_ollama=getattr(config.tools.knowledge.index, 'use_ollama', False),
+                        ollama_base_url=getattr(config.tools.knowledge.index, 'ollama_base_url', 'http://localhost:11434'),
                     )
                     app.state.retriever = retriever
                     console.print(f"[green]✓[/green] Knowledge: enabled ({config.tools.knowledge.index.embedding_model})")

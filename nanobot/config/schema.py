@@ -379,6 +379,8 @@ class KnowledgeIndexConfig(Base):
     llm_extract_batch: int = 10
     llm_extract_threshold: float = 0.7
     fallback_on_llm_error: bool = True
+    use_ollama: bool = False
+    ollama_base_url: str = "http://localhost:11434"
 
 
 class KnowledgeSearchConfig(Base):

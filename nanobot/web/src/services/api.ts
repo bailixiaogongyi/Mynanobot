@@ -1,6 +1,13 @@
 const API_BASE = "/api";
 
-async function request(endpoint: string, options: RequestInit = {}) {
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 3000;
+
+async function request(
+  endpoint: string,
+  options: RequestInit = {},
+  retryCount = 0,
+): Promise<any> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
     ...options,
@@ -10,8 +17,24 @@ async function request(endpoint: string, options: RequestInit = {}) {
     },
   });
 
+  if (response.status === 429 && retryCount < MAX_RETRIES) {
+    const retryAfter = response.headers.get("Retry-After");
+    const baseDelay = retryAfter
+      ? parseInt(retryAfter, 10) * 1000
+      : RETRY_DELAY;
+    const delay = baseDelay * Math.pow(2, retryCount);
+    console.log(
+      `[API] Rate limited, retrying in ${delay / 1000}s (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return request(endpoint, options, retryCount + 1);
+  }
+
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(
+      `API Error: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ""}`,
+    );
   }
 
   return response.json();
@@ -86,20 +109,27 @@ export const api = {
         body: JSON.stringify(model),
       }),
     deleteCustomModel: (provider: string, modelId: string) =>
-      request(`/config/provider/${provider}/models/custom?model_id=${encodeURIComponent(modelId)}`, {
-        method: "DELETE",
-      }),
+      request(
+        `/config/provider/${provider}/models/custom?model_id=${encodeURIComponent(modelId)}`,
+        {
+          method: "DELETE",
+        },
+      ),
     restart: () => request("/config/restart", { method: "POST" }),
   },
 
   chat: {
     getHistory: (sessionId: string = "default") =>
       request(`/chat/sessions/${sessionId}/history`),
-    send: (message: string, sessionId: string = "default", attachments?: any[]) =>
+    send: (
+      message: string,
+      sessionId: string = "default",
+      attachments?: any[],
+    ) =>
       request(`/chat/send`, {
         method: "POST",
-        body: JSON.stringify({ 
-          content: message, 
+        body: JSON.stringify({
+          content: message,
           chat_id: sessionId,
           attachments: attachments || [],
         }),
@@ -174,6 +204,46 @@ export const api = {
   skills: {
     list: () => request("/skills/list"),
     get: (name: string) => request(`/skills/${name}`),
+  },
+
+  marketplace: {
+    sources: () => request("/marketplace/sources"),
+    list: (
+      params: {
+        source?: string;
+        query?: string;
+        limit?: number;
+        cursor?: string;
+      } = {},
+    ) => {
+      const searchParams = new URLSearchParams();
+      if (params.source) searchParams.append("source", params.source);
+      if (params.query) searchParams.append("query", params.query);
+      if (params.limit) searchParams.append("limit", String(params.limit));
+      if (params.cursor) searchParams.append("cursor", params.cursor);
+      const queryString = searchParams.toString();
+      return request(
+        `/marketplace/list${queryString ? `?${queryString}` : ""}`,
+      );
+    },
+    detail: (slug: string) => request(`/marketplace/detail/${slug}`),
+    search: (query: string) =>
+      request(`/marketplace/search?q=${encodeURIComponent(query)}`),
+    install: (slug: string, source: string) =>
+      request("/marketplace/install", {
+        method: "POST",
+        body: JSON.stringify({ slug, source }),
+      }),
+    uninstall: (slug: string) =>
+      request("/marketplace/uninstall", {
+        method: "POST",
+        body: JSON.stringify({ slug }),
+      }),
+    update: (slug: string, source: string) =>
+      request("/marketplace/update", {
+        method: "POST",
+        body: JSON.stringify({ slug, source }),
+      }),
   },
 
   stats: {

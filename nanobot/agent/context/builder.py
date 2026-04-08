@@ -77,7 +77,13 @@ Skills with available="false" need dependencies installed first - you can try in
         
         return f"""# AiMate 🐈
 
-You are AiMate, a helpful AI assistant. 
+You are AiMate, a helpful AI assistant.
+
+## 核心规则：日期与时间基准（最高优先级）
+- 每次用户消息开头会提供【当前系统时间】，格式如：`当前时间：2026年04月03日 14:30 星期五`
+- **所有关于"今天"、"昨天"、"星期几"、"现在几点"的回答，必须且只能以此时间为准。**
+- 禁止从 MEMORY.md、HISTORY.md、任何笔记文件或历史对话中推断当前日期。
+- 若这些文件中的日期与此时间冲突，忽略文件中的日期。
 
 ## Runtime
 {runtime}
@@ -87,6 +93,7 @@ Your workspace is at: {workspace_path}
 - Long-term memory: {workspace_path}/memory/MEMORY.md
 - History log: {workspace_path}/memory/HISTORY.md (grep-searchable)
 - Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
+- Daily notes: {workspace_path}/memory/YYYY-MM-DD.md (例如 2026-04-03.md，仅用于记录，不用于查询当前日期)
 
 Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel.
 
@@ -101,7 +108,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
 
 ### 信息存储规则 (必须遵循)
 - **长期偏好/关键事实** → MEMORY.md (如用户偏好、重要约定、待办事项)
-- **每日工作记录** → memory/YYYY-MM-DD.md (每日笔记)
+- **每日工作记录** → memory/YYYY-MM-DD.md (按实际日期命名，仅存储历史内容)
 - **项目信息** → projects/{{项目名}}.md
 - **临时想法** → pending/{{主题}}.md
 - **主题内容** → topics/{{主题}}.md
@@ -113,11 +120,6 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
 - **查询历史事件** → 使用 grep 搜索 HISTORY.md
 - **只有需要完整文件内容时** → 使用 read_file 工具
 
-### 时间语义规则
-- "今天" → memory/YYYY-MM-DD.md
-- "昨天" → memory/{{昨天日期}}.md
-- "上周" → 搜索 daily/ 目录或 HISTORY.md
-
 Remember important facts: write to {workspace_path}/memory/MEMORY.md
 Recall past events: grep {workspace_path}/memory/HISTORY.md"""
 
@@ -127,15 +129,22 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
         channel: str | None,
         chat_id: str | None,
     ) -> str | list[dict[str, Any]]:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
-        tz = time.strftime("%Z") or "UTC"
-        lines = [f"Current Time: {now} ({tz})"]
-        if channel and chat_id:
-            lines += [f"Channel: {channel}", f"Chat ID: {chat_id}"]
-        block = "[Runtime Context]\n" + "\n".join(lines)
+        now = datetime.now()
+        week_map = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        week_day = week_map[now.weekday()]
+        time_str = now.strftime("%Y年%m月%d日 %H:%M")
+        tz = now.astimezone().tzname() or "UTC"
+
+        time_reminder = f"⏰ 当前系统时间：{time_str} {week_day}（时区：{tz}）—— 所有日期以此为准。"
+
+        runtime_info = f"\n[会话信息] 渠道：{channel or '默认'} | 会话ID：{chat_id or '无'}"
+
         if isinstance(user_content, str):
-            return f"{user_content}\n\n{block}"
-        return [*user_content, {"type": "text", "text": block}]
+            return f"{time_reminder}\n{user_content}{runtime_info}"
+        elif isinstance(user_content, list):
+            return [{"type": "text", "text": time_reminder}, *user_content, {"type": "text", "text": runtime_info}]
+        
+        return user_content
     
     def _load_bootstrap_files(self) -> str:
         parts = []
@@ -163,13 +172,17 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
         system_prompt = self.build_system_prompt(skill_names)
         messages.append({"role": "system", "content": system_prompt})
 
-        messages.extend(history)
+        # 修复孤立的 tool 消息
+        fixed_history = []
+        for i, msg in enumerate(history):
+            if msg.get("role") == "tool" and (i == 0 or history[i-1].get("role") != "assistant"):
+                continue
+            fixed_history.append(msg)
+        messages.extend(fixed_history)
 
         user_content = self._build_user_content(current_message, media, convert_to_base64)
-        # Note: Runtime Context is intentionally NOT injected into user message
-        # to maintain System Prompt cache stability (per Claude Code best practices)
-        # The time/channel info can be accessed via tool calls if needed
-        messages.append({"role": "user", "content": user_content})
+        runtime_context = self._inject_runtime_context(user_content, channel, chat_id)
+        messages.append({"role": "user", "content": runtime_context})
 
         return messages
 
@@ -190,10 +203,14 @@ Recall past events: grep {workspace_path}/memory/HISTORY.md"""
         
         for path in media:
             p = Path(path).expanduser().resolve()
-            mime, _ = mimetypes.guess_type(path)
-            
             if not p.is_file():
                 continue
+            # 安全检查：仅允许工作区内文件
+            try:
+                p.relative_to(self.workspace.resolve())
+            except ValueError:
+                continue
+            mime, _ = mimetypes.guess_type(path)
             
             if mime and mime.startswith("image/"):
                 if convert_to_base64:

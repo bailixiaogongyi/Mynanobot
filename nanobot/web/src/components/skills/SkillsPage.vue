@@ -2,7 +2,10 @@
   <div class="page-container">
     <div class="content-area">
       <div class="page-header">
-        <h2>技能列表</h2>
+        <h2>我的技能</h2>
+        <p class="page-description">
+          已安装的技能列表，包括内置技能和从市场安装的技能
+        </p>
       </div>
       <div class="skills-filter">
         <button
@@ -29,12 +32,29 @@
           :class="[
             'btn',
             'btn-sm',
+            filterSource === 'marketplace' ? 'btn-primary' : 'btn-secondary',
+          ]"
+          @click="filterSource = 'marketplace'"
+        >
+          市场技能
+        </button>
+        <button
+          :class="[
+            'btn',
+            'btn-sm',
             filterSource === 'workspace' ? 'btn-primary' : 'btn-secondary',
           ]"
           @click="filterSource = 'workspace'"
         >
           自建技能
         </button>
+        <router-link
+          to="/marketplace"
+          class="btn btn-sm btn-secondary"
+          style="margin-left: auto"
+        >
+          浏览市场
+        </router-link>
       </div>
       <div class="skills-grid">
         <div
@@ -46,7 +66,7 @@
           <div class="skill-header">
             <span class="skill-icon">{{ getSkillIcon(skill.name) }}</span>
             <div class="skill-info">
-              <h3 class="skill-name">{{ skill.name }}</h3>
+              <h3 class="skill-name">{{ skill.meta?.name || skill.name }}</h3>
               <p class="skill-description">
                 {{ skill.meta?.description || skill.description || "" }}
               </p>
@@ -54,7 +74,13 @@
           </div>
           <div class="skill-meta">
             <span :class="['skill-badge', 'skill-type-' + skill.source]">
-              {{ skill.source === "builtin" ? "内置" : "自建" }}
+              {{
+                skill.source === "builtin"
+                  ? "内置"
+                  : skill.source === "marketplace"
+                    ? "市场"
+                    : "自建"
+              }}
             </span>
             <span
               :class="[
@@ -70,6 +96,13 @@
       <div v-if="filteredSkills.length === 0" class="empty-state">
         <div class="empty-icon">🔧</div>
         <p>暂无技能</p>
+        <router-link
+          to="/marketplace"
+          class="btn btn-primary"
+          style="margin-top: 1rem"
+        >
+          浏览技能市场
+        </router-link>
       </div>
     </div>
 
@@ -85,7 +118,9 @@
           <div class="skill-detail-icon">
             {{ getSkillIcon(selectedSkill?.name || "") }}
           </div>
-          <h3 class="skill-detail-title">{{ selectedSkill?.name }}</h3>
+          <h3 class="skill-detail-title">
+            {{ selectedSkill?.meta?.name || selectedSkill?.name }}
+          </h3>
         </div>
         <div class="skill-detail-meta">
           <div class="skill-detail-badges">
@@ -147,7 +182,10 @@
               关闭
             </button>
             <button
-              v-if="selectedSkill?.source === 'workspace'"
+              v-if="
+                selectedSkill?.source === 'workspace' ||
+                selectedSkill?.source === 'marketplace'
+              "
               class="btn btn-danger"
               @click="deleteSkill(selectedSkill)"
             >
@@ -174,14 +212,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onActivated } from "vue";
 import { marked } from "marked";
 import api from "@/services/api";
 import Modal from "@/components/ui/Modal.vue";
 
 const skills = ref<any[]>([]);
 const selectedSkill = ref<any | null>(null);
-const filterSource = ref("all");
+const filterSource = ref<"all" | "builtin" | "workspace">("all");
 
 const filteredSkills = computed(() => {
   if (filterSource.value === "all") {
@@ -216,7 +254,6 @@ const getSkillIcon = (name: string) => {
   const iconMap: Record<string, string> = {
     archive: "📦",
     "browser-automation": "🌐",
-    clawhub: "🔌",
     cron: "⏰",
     "daily-note": "📅",
     "excel-operations": "📊",
@@ -250,11 +287,37 @@ const renderMarkdown = (content: string) => {
   return marked.parse(content) as string;
 };
 
-const deleteSkill = async (_skill: any) => {
-  alert(`删除技能功能暂未实现`);
+const deleteSkill = async (skill: any) => {
+  try {
+    if (skill.source === 'marketplace') {
+      // 市场技能使用 marketplace uninstall API
+      await api.marketplace.uninstall(skill.name);
+    } else if (skill.source === 'workspace') {
+      // 自建技能也可以删除，使用 marketplace uninstall API（临时解决方案）
+      // 后续可以添加专门的自建技能删除 API
+      await api.marketplace.uninstall(skill.name);
+    } else if (skill.source === 'builtin') {
+      // 内置技能不能删除
+      alert('内置技能不能删除');
+      return;
+    }
+    
+    // 删除成功后刷新技能列表
+    await loadSkills();
+    selectedSkill.value = null;
+  } catch (error) {
+    console.error('删除技能失败:', error);
+    alert('删除技能失败，请重试');
+  }
 };
 
-loadSkills();
+onMounted(() => {
+  loadSkills();
+});
+
+onActivated(() => {
+  loadSkills();
+});
 </script>
 
 <style scoped lang="scss">
@@ -371,6 +434,11 @@ loadSkills();
   &.skill-type-builtin {
     background-color: var(--color-info-bg);
     color: var(--color-info);
+  }
+
+  &.skill-type-marketplace {
+    background-color: var(--color-warning-bg);
+    color: var(--color-warning);
   }
 
   &.skill-type-workspace {
@@ -610,5 +678,85 @@ loadSkills();
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+// Marketplace styles
+.skill-marketplace {
+  position: relative;
+
+  &:hover {
+    .marketplace-actions {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.market-badge {
+  background-color: var(--color-purple-bg, #f3e8ff);
+  color: var(--color-purple, #9333ea);
+}
+
+.skill-version {
+  background-color: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+}
+
+.skill-update {
+  background-color: var(--color-warning-bg, #fef3c7);
+  color: var(--color-warning, #d97706);
+}
+
+.marketplace-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  opacity: 1;
+  transform: translateY(0);
+  transition: all var(--transition-fast);
+}
+
+.skill-type-marketplace {
+  background-color: var(--color-purple-bg, #f3e8ff);
+  color: var(--color-purple, #9333ea);
+}
+
+.loading-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--color-text-muted);
+
+  .loading-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-success {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 </style>

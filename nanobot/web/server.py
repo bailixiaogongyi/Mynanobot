@@ -202,7 +202,7 @@ def create_app(
     if hasattr(agent, 'bus'):
         app.state.bus = agent.bus
 
-    from nanobot.web.routes import auth, chat, config as config_routes, notes, skills
+    from nanobot.web.routes import auth, chat, config as config_routes, marketplace, notes, skills
     from nanobot.web.routes.upload import router as upload_router
     from nanobot.web.routes.agents import router as agents_router
     from nanobot.web.routes.dashboard import router as dashboard_router
@@ -212,6 +212,7 @@ def create_app(
     app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
     app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
+    app.include_router(marketplace.router, prefix="/api/marketplace", tags=["marketplace"])
     app.include_router(config_routes.router, prefix="/api/config", tags=["config"])
     app.include_router(upload_router, prefix="/api/upload", tags=["upload"])
     app.include_router(agents_router, prefix="/api/agents", tags=["agents"])

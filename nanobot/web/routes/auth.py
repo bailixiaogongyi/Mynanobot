@@ -39,6 +39,10 @@ class AuthRequest(BaseModel):
     fingerprint: str
 
 
+class VerifyRequest(BaseModel):
+    fingerprint: str
+
+
 class AuthStatusResponse(BaseModel):
     authenticated: bool
     requires_auth: bool
@@ -91,7 +95,7 @@ async def login(request: Request, auth_request: AuthRequest):
 
 
 @router.post("/verify")
-async def verify_fingerprint(request: Request, auth_request: AuthRequest):
+async def verify_fingerprint(request: Request, auth_request: VerifyRequest):
     if not is_auth_enabled(request):
         return VerifyResponse(valid=True)
 

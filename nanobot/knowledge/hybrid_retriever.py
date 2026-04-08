@@ -28,6 +28,62 @@ class EmbedderProtocol(Protocol):
         ...
 
 
+class OllamaEmbedder:
+    """Ollama embedding service client.
+
+    This class provides an alternative to sentence-transformers by calling
+    the Ollama API for embeddings. This reduces container size significantly.
+    """
+
+    def __init__(self, base_url: str, model: str):
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+
+    def encode(self, texts: list[str], normalize_embeddings: bool = False) -> list:
+        """Encode texts to embeddings using Ollama API.
+
+        Args:
+            texts: List of texts to encode
+            normalize_embeddings: Whether to normalize embeddings
+
+        Returns:
+            List of embedding vectors
+        """
+        import httpx
+
+        embeddings = []
+        with httpx.Client(timeout=60.0) as client:
+            for text in texts:
+                response = client.post(
+                    f"{self.base_url}/api/embeddings",
+                    json={"model": self.model, "prompt": text}
+                )
+                response.raise_for_status()
+                result = response.json()
+                embedding = result.get("embedding", result.get("embeddings", []))
+                if isinstance(embedding, list) and len(embedding) == 1:
+                    embedding = embedding[0]
+                embeddings.append(embedding)
+        return embeddings
+
+    def health_check(self) -> bool:
+        """Check if Ollama service is available.
+
+        Returns:
+            True if Ollama is reachable and responsive.
+        """
+        import httpx
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(f"{self.base_url}/api/tags")
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    def __repr__(self) -> str:
+        return f"OllamaEmbedder(model={self.model}, base_url={self.base_url})"
+
+
 class HybridRetriever:
     """Hybrid retriever combining BM25, vector search, and time filtering.
 
@@ -66,6 +122,8 @@ class HybridRetriever:
         llm_extract_threshold: float = 0.7,
         fallback_on_llm_error: bool = True,
         provider: Any = None,
+        use_ollama: bool = False,
+        ollama_base_url: str = "http://localhost:11434",
     ):
         self.persist_dir = Path(persist_dir)
         self.model_name = model_name
@@ -77,6 +135,8 @@ class HybridRetriever:
         self.llm_extract_batch = llm_extract_batch
         self.llm_extract_threshold = llm_extract_threshold
         self.fallback_on_llm_error = fallback_on_llm_error
+        self.use_ollama = use_ollama
+        self.ollama_base_url = ollama_base_url
 
         self.persist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -154,27 +214,53 @@ class HybridRetriever:
             logger.warning(f"Failed to initialize GraphRAG: {e}")
             self.use_graph = False
 
-    def _get_embedder(self) -> SentenceTransformer:
-        """Lazily load the embedding model."""
+    def _get_embedder(self) -> Any:
+        """Lazily load the embedding model or use Ollama with fallback."""
         if self._embedder is None:
-            try:
-                import os
-                from sentence_transformers import SentenceTransformer
+            import os
 
-                # Support HuggingFace mirror for users in China
-                hf_endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co")
-                if hf_endpoint != "https://huggingface.co":
-                    logger.info(f"Using HuggingFace mirror: {hf_endpoint}")
+            env_ollama_url = os.environ.get("OLLAMA_BASE_URL")
+            ollama_model = os.environ.get("OLLAMA_EMBEDDING_MODEL", self.model_name)
 
-                logger.info(f"Loading embedding model: {self.model_name}")
-                self._embedder = SentenceTransformer(self.model_name, device="cpu")
-                logger.info("Embedding model loaded successfully")
-            except ImportError as e:
-                raise ImportError(
-                    "sentence-transformers is required for vector search. "
-                    "Install it with: pip install sentence-transformers"
-                ) from e
+            use_ollama = self.use_ollama or bool(env_ollama_url)
+            ollama_base_url = env_ollama_url or self.ollama_base_url
+
+            if use_ollama and ollama_base_url:
+                ollama_embedder = OllamaEmbedder(
+                    base_url=ollama_base_url,
+                    model=ollama_model
+                )
+                if ollama_embedder.health_check():
+                    logger.info(f"Using Ollama embedder: {ollama_model} at {ollama_base_url}")
+                    self._embedder = ollama_embedder
+                    logger.info("Ollama embedder initialized successfully")
+                else:
+                    logger.warning(f"Ollama service at {ollama_base_url} is not available. Falling back to sentence-transformers.")
+                    self._embedder = self._load_sentence_transformer()
+            else:
+                self._embedder = self._load_sentence_transformer()
         return self._embedder
+
+    def _load_sentence_transformer(self) -> Any:
+        """Load sentence-transformers embedding model."""
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            hf_endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co")
+            if hf_endpoint != "https://huggingface.co":
+                logger.info(f"Using HuggingFace mirror: {hf_endpoint}")
+
+            logger.info(f"Loading embedding model: {self.model_name}")
+            embedder = SentenceTransformer(self.model_name, device="cpu")
+            logger.info("Embedding model loaded successfully")
+            return embedder
+        except ImportError as e:
+            raise ImportError(
+                "sentence-transformers is required for vector search. "
+                "Or set use_ollama=True and ollama_base_url in config, "
+                "or set OLLAMA_BASE_URL and OLLAMA_EMBEDDING_MODEL environment variables. "
+                f"Install sentence-transformers with: pip install sentence-transformers"
+            ) from e
 
     def _get_collection(self) -> chromadb.Collection:
         """Get or create ChromaDB collection."""
