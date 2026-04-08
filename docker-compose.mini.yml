@@ -50,7 +50,7 @@ services:
       - "8081:8080"
       - "18791:18790"
     volumes:
-      - C:/Users/Administrator/.nanobot-user1:/root/.nanobot
+      - ~/.nanobot-user1:/root/.nanobot
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
@@ -92,7 +92,7 @@ services:
       - "8082:8080"
       - "18792:18790"
     volumes:
-      - C:/Users/Administrator/.nanobot-user2:/root/.nanobot
+      - ~/.nanobot-user2:/root/.nanobot
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
