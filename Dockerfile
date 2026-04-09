@@ -1,44 +1,70 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# ✅ 使用国内镜像加速器
+FROM docker.1ms.run/python:3.12-slim-bookworm
 
 LABEL maintainer="AiMate contributors"
 LABEL description="Ultra-Lightweight Personal AI Assistant"
 LABEL version="0.1.4.post2"
 
-# 更换为清华镜像源（加速 Debian 包下载）
-RUN echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main' > /etc/apt/sources.list && \
-    echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main' >> /etc/apt/sources.list && \
-    echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main' >> /etc/apt/sources.list
+# ✅ 优化1：使用腾讯云镜像源（腾讯云环境优化）
+RUN echo 'deb https://mirrors.cloud.tencent.com/debian/ bookworm main' > /etc/apt/sources.list && \
+    echo 'deb https://mirrors.cloud.tencent.com/debian/ bookworm-updates main' >> /etc/apt/sources.list && \
+    echo 'deb https://mirrors.cloud.tencent.com/debian-security bookworm-security main' >> /etc/apt/sources.list
 
+# ✅ 优化2：安装系统依赖（增加重试机制）
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \
-    mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends nodejs && \
-    apt-get purge -y gnupg && \
-    apt-get autoremove -y && \
+    apt-get install -y --no-install-recommends curl ca-certificates git && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# 复制项目文件
 COPY pyproject.toml README.md LICENSE ./
-RUN mkdir -p nanobot bridge && touch nanobot/__init__.py && \
-    uv pip install --system --no-cache -i https://pypi.tuna.tsinghua.edu.cn/simple . && \
-    rm -rf nanobot bridge
-
 COPY nanobot/ nanobot/
 COPY bridge/ bridge/
-# 1. 使用 pip 直接安装 PyTorch CPU-only 版本（避免安装 GPU 版本造成镜像过大）
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-# 2. 使用清华镜像源安装其他 Python 依赖（包含 knowledge，但不会重新安装 GPU torch）
-RUN uv pip install --system --no-cache -i https://pypi.tuna.tsinghua.edu.cn/simple ".[web-ui,docx,pdf,excel,pptx,ocr,knowledge]" .
 
-WORKDIR /app/bridge
-# 使用淘宝镜像源安装 Node.js 依赖
-RUN npm config set registry https://registry.npmmirror.com && npm install && npm run build
-WORKDIR /app
+# ✅ 优化3：配置 pip 全局设置（增加超时和重试）
+RUN pip config set global.timeout 300 && \
+    pip config set global.retries 10 && \
+    pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com pypi.doubanio.com"
 
+# ✅ 优化4：安装基础依赖（使用清华源 + 阿里源备份）
+RUN pip install --no-cache-dir \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://mirrors.aliyun.com/pypi/simple/ \
+    . || \
+    pip install --no-cache-dir \
+    --index-url https://mirrors.aliyun.com/pypi/simple/ \
+    .
+
+# ✅ 优化5：安装 CPU 版 PyTorch（使用清华源 + PyTorch 官方源）
+RUN pip install --no-cache-dir \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision torchaudio || \
+    pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision torchaudio
+
+# ✅ 优化6：安装完整依赖（多源备份）
+RUN pip install --no-cache-dir \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://mirrors.aliyun.com/pypi/simple/ \
+    ".[web-ui,docx,pdf,excel,pptx,ocr,knowledge]" || \
+    pip install --no-cache-dir \
+    --index-url https://mirrors.aliyun.com/pypi/simple/ \
+    ".[web-ui,docx,pdf,excel,pptx,ocr,knowledge]"
+
+# ✅ 优化7：安装 Node.js 和构建前端（使用淘宝镜像）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nodejs npm && \
+    rm -rf /var/lib/apt/lists/* && \
+    cd bridge && \
+    npm config set registry https://registry.npmmirror.com && \
+    npm install --registry=https://registry.npmmirror.com && \
+    npm run build && \
+    cd ..
+
+# 数据目录
 RUN mkdir -p /root/.nanobot
 
 COPY docker-entrypoint.sh /usr/local/bin/
